@@ -1,0 +1,64 @@
+{
+  "layers": [
+    {
+      "id": 1,
+      "name": "Decision Provenance",
+      "scripts": [
+        "build_nexus_data.py"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": 2,
+      "name": "Causal Temporal Graph",
+      "scripts": [
+        "graph_builder.py",
+        "enrich_graph.py"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": 3,
+      "name": "Live Monitoring",
+      "scripts": [
+        "decay_monitor.py"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": 4,
+      "name": "Intelligence Engines",
+      "scripts": [
+        "counterfactual_engine.py",
+        "knowledge_concentration.py"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": 5,
+      "name": "API & Reports",
+      "scripts": [
+        "api.py",
+        "generate_risk_report.py"
+      ],
+      "status": "complete"
+    }
+  ],
+  "tech_stack": {
+    "graph_db": "Neo4j",
+    "vector_db": "Weaviate Cloud",
+    "ai": "Google Gemini 2.5 Flash",
+    "extraction": "Bob IDE",
+    "backend": "FastAPI",
+    "pdf": "ReportLab",
+    "graph_analysis": "NetworkX"
+  },
+  "stats": {
+    "repository": "https://github.com/postgres/postgres",
+    "analysis_window": "2 years",
+    "generated_at": "2026-05-17T06:31:22.094638+00:00",
+    "total_dprs": 15,
+    "total_nodes": 162,
+    "total_relationships": 202
+  }
+}

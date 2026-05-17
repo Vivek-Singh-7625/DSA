@@ -1,0 +1,63 @@
+﻿{
+    "meta":  {
+                 "repository":  "https://github.com/postgres/postgres",
+                 "analysis_window":  "2 years",
+                 "generated_at":  "2026-05-17T06:31:22.094638+00:00",
+                 "total_dprs":  15,
+                 "total_nodes":  162,
+                 "total_relationships":  202
+             },
+    "org_risk_score":  36.8,
+    "dpr_summary":  {
+                        "total":  15,
+                        "critical_blast":  8,
+                        "high_decay":  4,
+                        "components":  [
+                                           "WAL",
+                                           "MVCC",
+                                           "Autovacuum",
+                                           "Storage",
+                                           "ProcessModel",
+                                           "Replication"
+                                       ]
+                    },
+    "decay_summary":  {
+                          "total_alerts":  5,
+                          "active_decay":  4,
+                          "latest_run":  {
+                                             "run_at":  "2026-05-17T06:35:26.852971+00:00",
+                                             "commits_scanned":  5,
+                                             "dprs_evaluated":  6,
+                                             "new_alerts":  2,
+                                             "alert_summary":  [
+                                                                   "@{dpr_id=DPR-006; confidence=0.1; still_holds=False; trend=neutral}",
+                                                                   "@{dpr_id=DPR-008; confidence=0.2; still_holds=False; trend=weakened}",
+                                                                   "@{dpr_id=DPR-011; confidence=0.85; still_holds=True; trend=strengthened}",
+                                                                   "@{dpr_id=DPR-007; confidence=0.9; still_holds=True; trend=strengthened}",
+                                                                   "@{dpr_id=DPR-012; confidence=0.85; still_holds=True; trend=strengthened}",
+                                                                   "@{dpr_id=DPR-009; confidence=0.9; still_holds=True; trend=strengthened}"
+                                                               ]
+                                         }
+                      },
+    "knowledge_summary":  {
+                              "top_humans":  [
+                                                 "Tom Lane",
+                                                 "Heikki Linnakangas",
+                                                 "Vadim Mikheev"
+                                             ],
+                              "top_components":  [
+                                                     "MVCC",
+                                                     "Storage",
+                                                     "Autovacuum"
+                                                 ]
+                          },
+    "counterfactual_summary":  {
+                                   "total_traces":  5,
+                                   "verdicts":  {
+                                                    "worse":  0,
+                                                    "tradeoff":  0,
+                                                    "better":  0
+                                                }
+                               },
+    "pdf_available":  true
+}

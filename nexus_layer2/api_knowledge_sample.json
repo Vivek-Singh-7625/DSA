@@ -1,0 +1,452 @@
+﻿{
+    "org_risk_score":  36.8,
+    "generated_at":  "2026-05-17T06:36:23.794884+00:00",
+    "human_profiles":  [
+                           {
+                               "name":  "Tom Lane",
+                               "dpr_count":  9,
+                               "dprs":  [
+                                            "DPR-002",
+                                            "DPR-003",
+                                            "DPR-004",
+                                            "DPR-005",
+                                            "DPR-006",
+                                            "DPR-007",
+                                            "DPR-008",
+                                            "DPR-011",
+                                            "DPR-012"
+                                        ],
+                               "components":  [
+                                                  "Autovacuum",
+                                                  "MVCC",
+                                                  "Storage",
+                                                  "WAL"
+                                              ],
+                               "component_count":  4,
+                               "avg_blast_score":  3.67,
+                               "bus_factor_risk_score":  132.0
+                           },
+                           {
+                               "name":  "Heikki Linnakangas",
+                               "dpr_count":  4,
+                               "dprs":  [
+                                            "DPR-003",
+                                            "DPR-005",
+                                            "DPR-007",
+                                            "DPR-014"
+                                        ],
+                               "components":  [
+                                                  "MVCC",
+                                                  "Replication",
+                                                  "WAL"
+                                              ],
+                               "component_count":  3,
+                               "avg_blast_score":  3.5,
+                               "bus_factor_risk_score":  42.0
+                           },
+                           {
+                               "name":  "Vadim Mikheev",
+                               "dpr_count":  4,
+                               "dprs":  [
+                                            "DPR-003",
+                                            "DPR-007",
+                                            "DPR-010",
+                                            "DPR-013"
+                                        ],
+                               "components":  [
+                                                  "MVCC",
+                                                  "WAL"
+                                              ],
+                               "component_count":  2,
+                               "avg_blast_score":  3.5,
+                               "bus_factor_risk_score":  28.0
+                           },
+                           {
+                               "name":  "Original PostgreSQL team",
+                               "dpr_count":  2,
+                               "dprs":  [
+                                            "DPR-001",
+                                            "DPR-009"
+                                        ],
+                               "components":  [
+                                                  "ProcessModel",
+                                                  "Storage"
+                                              ],
+                               "component_count":  2,
+                               "avg_blast_score":  4.0,
+                               "bus_factor_risk_score":  16.0
+                           },
+                           {
+                               "name":  "Andres Freund",
+                               "dpr_count":  2,
+                               "dprs":  [
+                                            "DPR-004",
+                                            "DPR-011"
+                                        ],
+                               "components":  [
+                                                  "MVCC",
+                                                  "Storage"
+                                              ],
+                               "component_count":  2,
+                               "avg_blast_score":  4.0,
+                               "bus_factor_risk_score":  16.0
+                           },
+                           {
+                               "name":  "Alvaro Herrera",
+                               "dpr_count":  2,
+                               "dprs":  [
+                                            "DPR-006",
+                                            "DPR-008"
+                                        ],
+                               "components":  [
+                                                  "Autovacuum",
+                                                  "Storage"
+                                              ],
+                               "component_count":  2,
+                               "avg_blast_score":  4.0,
+                               "bus_factor_risk_score":  16.0
+                           },
+                           {
+                               "name":  "Fujii Masao",
+                               "dpr_count":  2,
+                               "dprs":  [
+                                            "DPR-013",
+                                            "DPR-014"
+                                        ],
+                               "components":  [
+                                                  "Replication",
+                                                  "WAL"
+                                              ],
+                               "component_count":  2,
+                               "avg_blast_score":  3.0,
+                               "bus_factor_risk_score":  12.0
+                           },
+                           {
+                               "name":  "Jan Wieck",
+                               "dpr_count":  1,
+                               "dprs":  [
+                                            "DPR-002"
+                                        ],
+                               "components":  [
+                                                  "Storage"
+                                              ],
+                               "component_count":  1,
+                               "avg_blast_score":  3.0,
+                               "bus_factor_risk_score":  3.0
+                           },
+                           {
+                               "name":  "Pavan Deolasee",
+                               "dpr_count":  1,
+                               "dprs":  [
+                                            "DPR-005"
+                                        ],
+                               "components":  [
+                                                  "MVCC"
+                                              ],
+                               "component_count":  1,
+                               "avg_blast_score":  3.0,
+                               "bus_factor_risk_score":  3.0
+                           },
+                           {
+                               "name":  "Greg Smith",
+                               "dpr_count":  1,
+                               "dprs":  [
+                                            "DPR-012"
+                                        ],
+                               "components":  [
+                                                  "WAL"
+                                              ],
+                               "component_count":  1,
+                               "avg_blast_score":  3.0,
+                               "bus_factor_risk_score":  3.0
+                           },
+                           {
+                               "name":  "pgBouncer: Marko Kreen",
+                               "dpr_count":  1,
+                               "dprs":  [
+                                            "DPR-015"
+                                        ],
+                               "components":  [
+                                                  "ProcessModel"
+                                              ],
+                               "component_count":  1,
+                               "avg_blast_score":  3.0,
+                               "bus_factor_risk_score":  3.0
+                           },
+                           {
+                               "name":  "pgPool: Tatsuo Ishii",
+                               "dpr_count":  1,
+                               "dprs":  [
+                                            "DPR-015"
+                                        ],
+                               "components":  [
+                                                  "ProcessModel"
+                                              ],
+                               "component_count":  1,
+                               "avg_blast_score":  3.0,
+                               "bus_factor_risk_score":  3.0
+                           }
+                       ],
+    "component_profiles":  [
+                               {
+                                   "component":  "MVCC",
+                                   "dpr_count":  4,
+                                   "dprs":  [
+                                                "DPR-003",
+                                                "DPR-004",
+                                                "DPR-005",
+                                                "DPR-010"
+                                            ],
+                                   "unique_humans":  5,
+                                   "humans":  [
+                                                  "Andres Freund",
+                                                  "Heikki Linnakangas",
+                                                  "Pavan Deolasee",
+                                                  "Tom Lane",
+                                                  "Vadim Mikheev"
+                                              ],
+                                   "avg_decay_risk":  2.25,
+                                   "avg_blast_radius":  3.5,
+                                   "spof_score":  6.3
+                               },
+                               {
+                                   "component":  "Storage",
+                                   "dpr_count":  4,
+                                   "dprs":  [
+                                                "DPR-001",
+                                                "DPR-002",
+                                                "DPR-006",
+                                                "DPR-011"
+                                            ],
+                                   "unique_humans":  5,
+                                   "humans":  [
+                                                  "Alvaro Herrera",
+                                                  "Andres Freund",
+                                                  "Jan Wieck",
+                                                  "Original PostgreSQL team",
+                                                  "Tom Lane"
+                                              ],
+                                   "avg_decay_risk":  2.0,
+                                   "avg_blast_radius":  3.75,
+                                   "spof_score":  6.0
+                               },
+                               {
+                                   "component":  "Autovacuum",
+                                   "dpr_count":  1,
+                                   "dprs":  [
+                                                "DPR-008"
+                                            ],
+                                   "unique_humans":  2,
+                                   "humans":  [
+                                                  "Alvaro Herrera",
+                                                  "Tom Lane"
+                                              ],
+                                   "avg_decay_risk":  3.0,
+                                   "avg_blast_radius":  4.0,
+                                   "spof_score":  6.0
+                               },
+                               {
+                                   "component":  "ProcessModel",
+                                   "dpr_count":  2,
+                                   "dprs":  [
+                                                "DPR-009",
+                                                "DPR-015"
+                                            ],
+                                   "unique_humans":  3,
+                                   "humans":  [
+                                                  "Original PostgreSQL team",
+                                                  "pgBouncer: Marko Kreen",
+                                                  "pgPool: Tatsuo Ishii"
+                                              ],
+                                   "avg_decay_risk":  1.5,
+                                   "avg_blast_radius":  3.5,
+                                   "spof_score":  3.5
+                               },
+                               {
+                                   "component":  "WAL",
+                                   "dpr_count":  3,
+                                   "dprs":  [
+                                                "DPR-007",
+                                                "DPR-012",
+                                                "DPR-013"
+                                            ],
+                                   "unique_humans":  5,
+                                   "humans":  [
+                                                  "Fujii Masao",
+                                                  "Greg Smith",
+                                                  "Heikki Linnakangas",
+                                                  "Tom Lane",
+                                                  "Vadim Mikheev"
+                                              ],
+                                   "avg_decay_risk":  1.67,
+                                   "avg_blast_radius":  3.33,
+                                   "spof_score":  3.33
+                               },
+                               {
+                                   "component":  "Replication",
+                                   "dpr_count":  1,
+                                   "dprs":  [
+                                                "DPR-014"
+                                            ],
+                                   "unique_humans":  2,
+                                   "humans":  [
+                                                  "Fujii Masao",
+                                                  "Heikki Linnakangas"
+                                              ],
+                                   "avg_decay_risk":  1.0,
+                                   "avg_blast_radius":  3.0,
+                                   "spof_score":  1.5
+                               }
+                           ],
+    "file_profiles":  [
+                          {
+                              "file":  "src/backend/access/heap/heapam.c",
+                              "dpr_count":  2,
+                              "dprs":  [
+                                           "DPR-003",
+                                           "DPR-005"
+                                       ],
+                              "avg_blast_score":  3.5,
+                              "criticality_score":  7.0
+                          },
+                          {
+                              "file":  "src/backend/utils/time/tqual.c",
+                              "dpr_count":  2,
+                              "dprs":  [
+                                           "DPR-003",
+                                           "DPR-010"
+                                       ],
+                              "avg_blast_score":  3.5,
+                              "criticality_score":  7.0
+                          },
+                          {
+                              "file":  "src/backend/access/transam/xlog.c",
+                              "dpr_count":  2,
+                              "dprs":  [
+                                           "DPR-007",
+                                           "DPR-012"
+                                       ],
+                              "avg_blast_score":  3.5,
+                              "criticality_score":  7.0
+                          },
+                          {
+                              "file":  "src/backend/access/transam/xloginsert.c",
+                              "dpr_count":  2,
+                              "dprs":  [
+                                           "DPR-007",
+                                           "DPR-013"
+                                       ],
+                              "avg_blast_score":  3.5,
+                              "criticality_score":  7.0
+                          },
+                          {
+                              "file":  "src/include/pg_config_manual.h",
+                              "dpr_count":  1,
+                              "dprs":  [
+                                           "DPR-001"
+                                       ],
+                              "avg_blast_score":  4.0,
+                              "criticality_score":  4.0
+                          },
+                          {
+                              "file":  "src/backend/storage/page/bufpage.c",
+                              "dpr_count":  1,
+                              "dprs":  [
+                                           "DPR-001"
+                                       ],
+                              "avg_blast_score":  4.0,
+                              "criticality_score":  4.0
+                          },
+                          {
+                              "file":  "src/include/access/transam.h",
+                              "dpr_count":  1,
+                              "dprs":  [
+                                           "DPR-004"
+                                       ],
+                              "avg_blast_score":  4.0,
+                              "criticality_score":  4.0
+                          },
+                          {
+                              "file":  "src/backend/access/transam/varsup.c",
+                              "dpr_count":  1,
+                              "dprs":  [
+                                           "DPR-004"
+                                       ],
+                              "avg_blast_score":  4.0,
+                              "criticality_score":  4.0
+                          },
+                          {
+                              "file":  "src/backend/commands/vacuum.c",
+                              "dpr_count":  1,
+                              "dprs":  [
+                                           "DPR-006"
+                                       ],
+                              "avg_blast_score":  4.0,
+                              "criticality_score":  4.0
+                          },
+                          {
+                              "file":  "src/backend/commands/vacuumlazy.c",
+                              "dpr_count":  1,
+                              "dprs":  [
+                                           "DPR-006"
+                                       ],
+                              "avg_blast_score":  4.0,
+                              "criticality_score":  4.0
+                          },
+                          {
+                              "file":  "src/backend/postmaster/autovacuum.c",
+                              "dpr_count":  1,
+                              "dprs":  [
+                                           "DPR-008"
+                                       ],
+                              "avg_blast_score":  4.0,
+                              "criticality_score":  4.0
+                          },
+                          {
+                              "file":  "src/backend/postmaster/postmaster.c",
+                              "dpr_count":  1,
+                              "dprs":  [
+                                           "DPR-009"
+                                       ],
+                              "avg_blast_score":  4.0,
+                              "criticality_score":  4.0
+                          },
+                          {
+                              "file":  "src/backend/storage/buffer/bufmgr.c",
+                              "dpr_count":  1,
+                              "dprs":  [
+                                           "DPR-011"
+                                       ],
+                              "avg_blast_score":  4.0,
+                              "criticality_score":  4.0
+                          },
+                          {
+                              "file":  "src/backend/access/heap/tuptoaster.c",
+                              "dpr_count":  1,
+                              "dprs":  [
+                                           "DPR-002"
+                                       ],
+                              "avg_blast_score":  3.0,
+                              "criticality_score":  3.0
+                          },
+                          {
+                              "file":  "src/backend/access/heap/pruneheap.c",
+                              "dpr_count":  1,
+                              "dprs":  [
+                                           "DPR-005"
+                                       ],
+                              "avg_blast_score":  3.0,
+                              "criticality_score":  3.0
+                          }
+                      ],
+    "top_spof_humans":  [
+                            "Tom Lane",
+                            "Heikki Linnakangas",
+                            "Vadim Mikheev"
+                        ],
+    "top_spof_components":  [
+                                "MVCC",
+                                "Storage",
+                                "Autovacuum"
+                            ]
+}

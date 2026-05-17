@@ -1,0 +1,2733 @@
+{
+  "meta": {
+    "repository": "https://github.com/postgres/postgres",
+    "analysis_window": "1year",
+    "analysis_timestamp": "2026-05-17T08:28:48.810448+00:00",
+    "total_dprs": 30,
+    "total_nodes": 30,
+    "total_relationships": 55,
+    "components": [
+      "Partitioning",
+      "Autovacuum",
+      "Catalog",
+      "ProcessModel",
+      "AIO",
+      "MVCC",
+      "Executor",
+      "Storage",
+      "IndexAM",
+      "Planner",
+      "Replication",
+      "WAL"
+    ],
+    "pipeline_version": "2.0.0"
+  },
+  "org_risk_score": 72,
+  "dprs": [
+    {
+      "id": "DPR-001",
+      "title": "8KB Fixed Page Size",
+      "component": "Storage",
+      "blast_radius": "critical",
+      "decay_risk": "medium",
+      "within_window": false,
+      "decision_date": "pre-window",
+      "decision": "PostgreSQL uses a fixed 8KB page size (BLCKSZ) as the fundamental unit of storage and I/O.",
+      "implicit_assumptions": [
+        "INFERRED: 8KB aligns with filesystem blocks",
+        "INFERRED: Most rows fit in 8KB",
+        "INFERRED: OS cache works well with 8KB"
+      ],
+      "explicit_constraints": [
+        "Compile-time constant",
+        "All structures assume 8KB",
+        "Buffer pool manages 8KB units",
+        "WAL references 8KB blocks"
+      ],
+      "active_workarounds": [
+        "TOAST for large values",
+        "Fillfactor tuning",
+        "Custom builds with different BLCKSZ"
+      ],
+      "files_involved": [
+        "src/include/pg_config_manual.h",
+        "src/backend/storage/page/bufpage.c"
+      ],
+      "involved_humans": [
+        "Original PostgreSQL team"
+      ],
+      "rejected_alternatives": [
+        "Variable page sizes - complexity in buffer management",
+        "16KB/32KB pages - write amplification",
+        "4KB pages - metadata overhead"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Changing requires recompilation and full database rebuild",
+      "decay_risk_reasoning": "Modern NVMe SSDs use 16-32KB internal pages",
+      "blast_radius_reasoning": "Every storage operation depends on this constant",
+      "commit_refs": [
+        "Original PostgreSQL 6.x design"
+      ],
+      "causal_dependencies": [
+        "DPR-002: TOAST exists because of 8KB limit",
+        "DPR-005: HOT designed around 8KB",
+        "DPR-012: Checkpoints write 8KB units"
+      ],
+      "causal_in": [],
+      "causal_out": [
+        "DPR-002",
+        "DPR-005",
+        "DPR-012",
+        "DPR-011",
+        "DPR-013"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-002",
+      "title": "TOAST - The Oversized-Attribute Storage Technique",
+      "component": "Storage",
+      "blast_radius": "high",
+      "decay_risk": "low",
+      "within_window": false,
+      "decision_date": "2001",
+      "decision": "Values >2KB automatically compressed/moved to separate TOAST tables.",
+      "implicit_assumptions": [
+        "INFERRED: Large values accessed less frequently",
+        "INFERRED: Compression ratios good enough",
+        "INFERRED: Decompression overhead acceptable"
+      ],
+      "explicit_constraints": [
+        "Threshold ~2KB",
+        "Per-table TOAST tables",
+        "2KB chunks",
+        "Must decompress to access"
+      ],
+      "active_workarounds": [
+        "SET STORAGE EXTERNAL",
+        "SET STORAGE MAIN",
+        "Application-level compression"
+      ],
+      "files_involved": [
+        "src/backend/access/heap/tuptoaster.c"
+      ],
+      "involved_humans": [
+        "Jan Wieck",
+        "Tom Lane"
+      ],
+      "rejected_alternatives": [
+        "Multi-page tuples - visibility complexity",
+        "Larger pages - wastes space",
+        "Fail on large values - users need large data"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Deeply integrated into tuple storage and MVCC",
+      "decay_risk_reasoning": "Design is stable, though modern compression could improve",
+      "blast_radius_reasoning": "Affects query planning, storage, backup, replication",
+      "commit_refs": [
+        "PostgreSQL 7.1 (2001)"
+      ],
+      "causal_dependencies": [
+        "DPR-001: Exists because 8KB pages too small",
+        "DPR-003: MVCC must handle TOAST pointers",
+        "DPR-006: Vacuum must clean TOAST tables"
+      ],
+      "causal_in": [
+        "DPR-001"
+      ],
+      "causal_out": [
+        "DPR-006"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-003",
+      "title": "MVCC via Tuple Versioning in Heap",
+      "component": "MVCC",
+      "blast_radius": "critical",
+      "decay_risk": "high",
+      "within_window": false,
+      "decision_date": "1999",
+      "decision": "MVCC by storing multiple row versions in heap with xmin/xmax for visibility.",
+      "implicit_assumptions": [
+        "INFERRED: Transactions are short-lived",
+        "INFERRED: Reads tolerate dead tuples",
+        "INFERRED: Vacuum keeps up"
+      ],
+      "explicit_constraints": [
+        "xmin/xmax XIDs in tuple header",
+        "Dead tuples remain until vacuum",
+        "32-bit XID wraparound"
+      ],
+      "active_workarounds": [
+        "HOT updates",
+        "Aggressive autovacuum",
+        "Partitioning",
+        "pg_repack",
+        "Long-transaction monitoring"
+      ],
+      "files_involved": [
+        "src/backend/access/heap/heapam.c",
+        "src/backend/utils/time/tqual.c"
+      ],
+      "involved_humans": [
+        "Vadim Mikheev",
+        "Tom Lane",
+        "Heikki Linnakangas"
+      ],
+      "rejected_alternatives": [
+        "Undo logs - undo tablespace complexity",
+        "Separate version area - extra I/O",
+        "Single version + undo - old version access expensive"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Core concurrency control mechanism",
+      "decay_risk_reasoning": "High-update workloads create massive bloat, long transactions block vacuum",
+      "blast_radius_reasoning": "Every read/write depends on MVCC visibility rules",
+      "commit_refs": [
+        "PostgreSQL 6.5 (1999)"
+      ],
+      "causal_dependencies": [
+        "DPR-006: Vacuum cleans dead versions",
+        "DPR-004: XID wraparound",
+        "DPR-005: HOT optimizes versioning",
+        "DPR-010: Enables snapshot isolation"
+      ],
+      "causal_in": [
+        "DPR-004",
+        "DPR-006"
+      ],
+      "causal_out": [
+        "DPR-005",
+        "DPR-006",
+        "DPR-004",
+        "DPR-010",
+        "DPR-008"
+      ],
+      "decay_alert": {
+        "already_decaying": true,
+        "decay_evidence": "High-update workloads on cloud storage creating bloat faster than vacuum can clean",
+        "earliest_signal_date": "2024-Q3",
+        "recommended_monitor_query": "SELECT schemaname, tablename, n_dead_tup, n_live_tup, round(100.0 * n_dead_tup / NULLIF(n_live_tup + n_dead_tup, 0), 2) as dead_pct FROM pg_stat_user_tables WHERE n_dead_tup > 10000 ORDER BY n_dead_tup DESC"
+      }
+    },
+    {
+      "id": "DPR-004",
+      "title": "32-bit Transaction ID with Wraparound",
+      "component": "MVCC",
+      "blast_radius": "critical",
+      "decay_risk": "high",
+      "within_window": false,
+      "decision_date": "2002",
+      "decision": "XIDs are 32-bit wrapping after ~4B transactions, requiring periodic vacuum freeze.",
+      "implicit_assumptions": [
+        "INFERRED: Won't exceed 2B between freezes",
+        "INFERRED: Vacuum freeze completes in time",
+        "INFERRED: 32-bit saves enough space"
+      ],
+      "explicit_constraints": [
+        "XID 0-4,294,967,295",
+        "Modulo-2^31 arithmetic",
+        "Freeze tuples >2B transactions old",
+        "Forced shutdown if imminent"
+      ],
+      "active_workarounds": [
+        "Aggressive freeze_max_age",
+        "age(datfrozenxid) monitoring",
+        "Manual VACUUM FREEZE",
+        "Partitioning",
+        "PG14+ failsafe"
+      ],
+      "files_involved": [
+        "src/include/access/transam.h",
+        "src/backend/access/transam/varsup.c"
+      ],
+      "involved_humans": [
+        "Tom Lane",
+        "Andres Freund"
+      ],
+      "rejected_alternatives": [
+        "64-bit XIDs - tuple header size",
+        "Epoch-based - visibility complexity",
+        "Timestamp-based - clock skew"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "XID size baked into tuple header format",
+      "decay_risk_reasoning": "High-throughput systems hit limits quickly, large tables take hours to freeze",
+      "blast_radius_reasoning": "Can cause database shutdown and data loss",
+      "commit_refs": [
+        "PostgreSQL 7.2 (2002)"
+      ],
+      "causal_dependencies": [
+        "DPR-003: MVCC needs XIDs",
+        "DPR-006: Vacuum must freeze",
+        "DPR-008: Autovacuum prevents wraparound"
+      ],
+      "causal_in": [
+        "DPR-003"
+      ],
+      "causal_out": [
+        "DPR-003",
+        "DPR-006",
+        "DPR-008"
+      ],
+      "decay_alert": {
+        "already_decaying": true,
+        "decay_evidence": "High-throughput OLTP systems (100K+ TPS) can generate 2B transactions in ~6 hours",
+        "earliest_signal_date": "2024-Q2",
+        "recommended_monitor_query": "SELECT datname, age(datfrozenxid) as xid_age, 2000000000 - age(datfrozenxid) as xids_until_wraparound FROM pg_database WHERE datallowconn ORDER BY age(datfrozenxid) DESC"
+      }
+    },
+    {
+      "id": "DPR-005",
+      "title": "HOT (Heap-Only Tuple) Updates",
+      "component": "MVCC",
+      "blast_radius": "high",
+      "decay_risk": "medium",
+      "within_window": false,
+      "decision_date": "2008",
+      "decision": "UPDATEs not changing indexed columns and fitting on same page create HOT chains without index updates.",
+      "implicit_assumptions": [
+        "INFERRED: Most updates don't change indexed columns",
+        "INFERRED: Pages have space",
+        "INFERRED: Chain traversal < index update cost"
+      ],
+      "explicit_constraints": [
+        "Same-page fit required",
+        "No indexed column changes",
+        "HOT chains followed during scans",
+        "Needs free space (fillfactor)"
+      ],
+      "active_workarounds": [
+        "Fillfactor tuning (70%)",
+        "Avoid indexes on updated columns",
+        "Partial indexes",
+        "Monitor n_tup_hot_upd"
+      ],
+      "files_involved": [
+        "src/backend/access/heap/heapam.c",
+        "src/backend/access/heap/pruneheap.c"
+      ],
+      "involved_humans": [
+        "Pavan Deolasee",
+        "Tom Lane",
+        "Heikki Linnakangas"
+      ],
+      "rejected_alternatives": [
+        "Always update indexes - write amplification",
+        "Differential updates - reconstruction complexity",
+        "Index-organized tables - forces index updates"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Critical performance optimization for update-heavy workloads",
+      "decay_risk_reasoning": "Many indexed columns or large rows may not benefit",
+      "blast_radius_reasoning": "Affects update performance, index maintenance, vacuum",
+      "commit_refs": [
+        "PostgreSQL 8.3 (2008)"
+      ],
+      "causal_dependencies": [
+        "DPR-001: Works within 8KB pages",
+        "DPR-003: Optimizes tuple versioning",
+        "DPR-006: Vacuum handles HOT chains"
+      ],
+      "causal_in": [
+        "DPR-003",
+        "DPR-001"
+      ],
+      "causal_out": [
+        "DPR-006"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-006",
+      "title": "Vacuum as Separate Maintenance Process",
+      "component": "Storage",
+      "blast_radius": "critical",
+      "decay_risk": "high",
+      "within_window": false,
+      "decision_date": "2002",
+      "decision": "Dead tuple cleanup via separate VACUUM process, not inline.",
+      "implicit_assumptions": [
+        "INFERRED: Can run frequently enough",
+        "INFERRED: Maintenance windows exist",
+        "INFERRED: Vacuum I/O manageable",
+        "INFERRED: Tables small enough"
+      ],
+      "explicit_constraints": [
+        "Must scan entire table",
+        "Requires maintenance_work_mem",
+        "Blocked by long transactions",
+        "Must clean indexes",
+        "VACUUM FREEZE for wraparound"
+      ],
+      "active_workarounds": [
+        "Autovacuum tuning",
+        "Partitioning",
+        "pg_repack",
+        "Bloat monitoring",
+        "PG13+ parallel vacuum"
+      ],
+      "files_involved": [
+        "src/backend/commands/vacuum.c",
+        "src/backend/commands/vacuumlazy.c"
+      ],
+      "involved_humans": [
+        "Tom Lane",
+        "Alvaro Herrera"
+      ],
+      "rejected_alternatives": [
+        "Inline cleanup - unpredictable latency",
+        "Per-table threads - process model constraints",
+        "Undo log auto-cleanup - undo storage complexity"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Fundamental to PostgreSQL's MVCC implementation",
+      "decay_risk_reasoning": "TB+ tables take hours, high update rates outpace vacuum, cloud I/O costs",
+      "blast_radius_reasoning": "Affects bloat, performance, wraparound safety, storage costs",
+      "commit_refs": [
+        "Lazy vacuum PostgreSQL 7.2 (2002)"
+      ],
+      "causal_dependencies": [
+        "DPR-003: Cleans MVCC dead tuples",
+        "DPR-004: Freezes for wraparound",
+        "DPR-008: Autovacuum automates this"
+      ],
+      "causal_in": [
+        "DPR-002",
+        "DPR-003",
+        "DPR-005",
+        "DPR-004",
+        "DPR-010"
+      ],
+      "causal_out": [
+        "DPR-003",
+        "DPR-008"
+      ],
+      "decay_alert": {
+        "already_decaying": true,
+        "decay_evidence": "TB-scale tables taking 6-12 hours to vacuum, cloud storage IOPS limits making vacuum expensive",
+        "earliest_signal_date": "2024-Q1",
+        "recommended_monitor_query": "SELECT pid, datname, relid::regclass, phase, heap_blks_total, heap_blks_scanned, round(100.0 * heap_blks_scanned / NULLIF(heap_blks_total, 0), 2) as pct_complete FROM pg_stat_progress_vacuum",
+        "last_evaluated": "2026-05-17T06:35:26.852971+00:00",
+        "live_confidence": 0.1,
+        "live_still_holds": false,
+        "live_reasoning": "The original decay evidence (TB-scale tables taking 6-12 hours to vacuum, cloud storage IOPS limits making vacuum expensive) directly contradicts the inferred assumptions that vacuum can run frequently enough, maintenance windows exist, vacuum I/O is manageable, and tables are small enough. These issues represent fundamental challenges of scale and cost.\n\nThe recent commit 'Refactor autovacuum threshold calculations' by Tom Lane addresses the *scheduling* or *triggering* logic for autovacuum, an *automatic* background process. While autovacuum is related to vacuuming, this commit does not address the core problems identified by the decay evidence: the *duration* and *cost* of vacuuming very large tables. Improving when autovacuum runs does not make the actual vacuum operation on TB-scale tables faster or cheaper, nor does it create more maintenance windows or reduce IOPS costs for a 'separate maintenance process'. Therefore, the assumption that a 'separate maintenance process' for vacuuming is viable under these conditions still does not hold.\n\nThe commit is considered 'neutral' because it doesn't directly strengthen or weaken the feasibility of the *separate maintenance process* itself. It's an optimization for the automatic counterpart, which might indirectly alleviate some pressure but doesn't resolve the fundamental issues of scale and cost for a dedicated, separate vacuum operation. No new decay signal is present; the commit is an improvement/refactoring, not an indication of a new problem."
+      },
+      "last_monitored": "2026-05-17T06:35:26.852971+00:00",
+      "blast_radius_score": 0.3333,
+      "blast_radius_dpr_ids": [
+        "DPR-003",
+        "DPR-004",
+        "DPR-005",
+        "DPR-008",
+        "DPR-010"
+      ]
+    },
+    {
+      "id": "DPR-007",
+      "title": "Write-Ahead Logging (WAL) for Durability",
+      "component": "WAL",
+      "blast_radius": "critical",
+      "decay_risk": "medium",
+      "within_window": false,
+      "decision_date": "2001",
+      "decision": "All modifications written to sequential WAL before data pages.",
+      "implicit_assumptions": [
+        "INFERRED: Sequential WAL >> random data writes",
+        "INFERRED: fsync actually persists",
+        "INFERRED: WAL volume manageable"
+      ],
+      "explicit_constraints": [
+        "WAL before data",
+        "fsync before commit",
+        "16MB segments",
+        "Full-page images after checkpoints",
+        "Retained for replication/PITR"
+      ],
+      "active_workarounds": [
+        "wal_compression",
+        "wal_buffers tuning",
+        "synchronous_commit=off",
+        "WAL archiving"
+      ],
+      "files_involved": [
+        "src/backend/access/transam/xlog.c",
+        "src/backend/access/transam/xloginsert.c"
+      ],
+      "involved_humans": [
+        "Vadim Mikheev",
+        "Tom Lane",
+        "Heikki Linnakangas"
+      ],
+      "rejected_alternatives": [
+        "Synchronous data writes - random I/O too slow",
+        "Shadow paging - complexity",
+        "No durability - unacceptable"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Foundation of durability and crash recovery",
+      "decay_risk_reasoning": "NVMe blurs sequential vs random I/O, cloud storage different guarantees",
+      "blast_radius_reasoning": "Every write generates WAL, enables replication/backup/recovery",
+      "commit_refs": [
+        "PostgreSQL 7.1 (2001)"
+      ],
+      "causal_dependencies": [
+        "DPR-012: Checkpoints limit replay",
+        "DPR-013: Full-page writes for torn pages",
+        "DPR-014: Replication uses WAL"
+      ],
+      "causal_in": [],
+      "causal_out": [
+        "DPR-013",
+        "DPR-012",
+        "DPR-014"
+      ],
+      "decay_alert": {
+        "last_evaluated": "2026-05-17T06:35:26.852971+00:00",
+        "live_confidence": 0.9,
+        "live_still_holds": true,
+        "live_reasoning": "The commit 'Improve WAL segment recycling under heavy write load' directly addresses the inferred assumption 'WAL volume manageable'. By improving recycling efficiency, especially under heavy load, it makes the management of WAL volume more robust and efficient. This strengthens the assumption that WAL volume can be effectively managed, preventing it from growing unbounded or causing performance issues due to excessive disk usage. It does not challenge the other inferred assumptions regarding sequential writes or fsync reliability. The commit is a positive improvement, not an indicator of decay."
+      },
+      "last_monitored": "2026-05-17T06:35:26.852971+00:00"
+    },
+    {
+      "id": "DPR-008",
+      "title": "Autovacuum as Background Daemon",
+      "component": "Autovacuum",
+      "blast_radius": "critical",
+      "decay_risk": "high",
+      "within_window": false,
+      "decision_date": "2005",
+      "decision": "Background daemon auto-schedules VACUUM/ANALYZE based on table activity.",
+      "implicit_assumptions": [
+        "INFERRED: 20% threshold appropriate",
+        "INFERRED: 3 workers sufficient",
+        "INFERRED: Cost throttling prevents I/O overwhelm"
+      ],
+      "explicit_constraints": [
+        "Max 3 workers default",
+        "Threshold: base + scale_factor * reltuples",
+        "Cost-based throttling",
+        "Blocked by locks/long transactions"
+      ],
+      "active_workarounds": [
+        "Per-table settings",
+        "Increase max_workers",
+        "Lower scale_factor (0.01)",
+        "Disable cost delay",
+        "Manual vacuum"
+      ],
+      "files_involved": [
+        "src/backend/postmaster/autovacuum.c"
+      ],
+      "involved_humans": [
+        "Alvaro Herrera",
+        "Tom Lane"
+      ],
+      "rejected_alternatives": [
+        "Manual only - users forget",
+        "Inline cleanup - unpredictable latency",
+        "Per-table threads - resource limits"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Critical for preventing bloat and wraparound",
+      "decay_risk_reasoning": "20% of 1TB = 200GB too much, high-velocity overwhelms workers",
+      "blast_radius_reasoning": "Misconfiguration is top cause of production issues",
+      "commit_refs": [
+        "PostgreSQL 8.1 (2005), default 8.3 (2008)"
+      ],
+      "causal_dependencies": [
+        "DPR-006: Automates vacuum",
+        "DPR-004: Prevents wraparound",
+        "DPR-003: Cleans MVCC tuples"
+      ],
+      "causal_in": [
+        "DPR-004",
+        "DPR-003",
+        "DPR-006"
+      ],
+      "causal_out": [],
+      "decay_alert": {
+        "already_decaying": true,
+        "decay_evidence": "20% of 1TB table = 200GB of changes before vacuum triggers, causing massive bloat",
+        "earliest_signal_date": "2024-Q2",
+        "recommended_monitor_query": "SELECT schemaname, tablename, n_tup_ins + n_tup_upd + n_tup_del as total_changes, n_live_tup, round(100.0 * (n_tup_ins + n_tup_upd + n_tup_del) / NULLIF(n_live_tup, 0), 2) as change_pct FROM pg_stat_user_tables WHERE pg_total_relation_size(schemaname||'.'||tablename) > 10737418240 ORDER BY total_changes DESC",
+        "last_evaluated": "2026-05-17T06:35:26.852971+00:00",
+        "live_confidence": 0.2,
+        "live_still_holds": false,
+        "live_reasoning": "The original decay evidence already highlighted that the '20% threshold appropriate' part of the assumption was problematic, leading to massive bloat (200GB for a 1TB table). The recent commit, 'Refactor autovacuum threshold calculations,' directly addresses this specific component. The act of refactoring implies that the previous calculations, and thus the underlying assumption about the 20% threshold's appropriateness, were found to be suboptimal or incorrect. Therefore, this part of the assumption no longer holds. The commit weakens the overall assumption by confirming the need for significant changes to address its flaws. While the commit doesn't directly address the '3 workers sufficient' or 'cost throttling' parts, the most critical and previously decayed part of the assumption is being actively changed, significantly lowering confidence in the assumption as a whole.",
+        "new_decay_signal": "The necessity of refactoring autovacuum threshold calculations confirms that the original assumption regarding the 20% threshold's appropriateness was flawed."
+      },
+      "last_monitored": "2026-05-17T06:35:26.852971+00:00",
+      "blast_radius_score": 0.0,
+      "blast_radius_dpr_ids": []
+    },
+    {
+      "id": "DPR-009",
+      "title": "Multi-Process Architecture",
+      "component": "ProcessModel",
+      "blast_radius": "critical",
+      "decay_risk": "medium",
+      "within_window": false,
+      "decision_date": "1990s",
+      "decision": "Process-per-connection, not multi-threaded.",
+      "implicit_assumptions": [
+        "INFERRED: Process overhead acceptable",
+        "INFERRED: External pooling (pgBouncer)",
+        "INFERRED: Process isolation = stability"
+      ],
+      "explicit_constraints": [
+        "Separate memory per process",
+        "Process creation overhead",
+        "IPC via shared memory",
+        "OS process limits"
+      ],
+      "active_workarounds": [
+        "pgBouncer/pgPool-II",
+        "Increase shared_buffers",
+        "Connection limits",
+        "App-level pooling"
+      ],
+      "files_involved": [
+        "src/backend/postmaster/postmaster.c"
+      ],
+      "involved_humans": [
+        "Original PostgreSQL team"
+      ],
+      "rejected_alternatives": [
+        "Multi-threaded - 1990s portability/complexity",
+        "In-server pooling - isolation complexity",
+        "Event loop - can't use multiple cores"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Deeply embedded in architecture",
+      "decay_risk_reasoning": "High connection counts consume excessive memory, cloud charges for memory",
+      "blast_radius_reasoning": "Affects every aspect of PostgreSQL",
+      "commit_refs": [
+        "Original design"
+      ],
+      "causal_dependencies": [
+        "DPR-011: Shared memory for buffer pool",
+        "DPR-015: Connection poolers needed"
+      ],
+      "causal_in": [],
+      "causal_out": [
+        "DPR-011",
+        "DPR-015"
+      ],
+      "decay_alert": {
+        "last_evaluated": "2026-05-17T06:35:26.852971+00:00",
+        "live_confidence": 0.9,
+        "live_still_holds": true,
+        "live_reasoning": "The commit 'Improve parallel query worker allocation' indicates active development and optimization *within* the multi-process architecture. This suggests that the multi-process model is still the chosen paradigm and is being refined for better performance and efficiency. This directly strengthens the assumption that process overhead is acceptable (or being made more acceptable through optimization) and implicitly supports the continued value of process isolation for stability. It does not introduce any signal that the architecture is failing or becoming problematic; rather, it shows continued investment."
+      },
+      "last_monitored": "2026-05-17T06:35:26.852971+00:00"
+    },
+    {
+      "id": "DPR-010",
+      "title": "Snapshot Isolation as Default",
+      "component": "MVCC",
+      "blast_radius": "high",
+      "decay_risk": "low",
+      "within_window": false,
+      "decision_date": "1999",
+      "decision": "READ COMMITTED and REPEATABLE READ snapshot isolation via MVCC.",
+      "implicit_assumptions": [
+        "INFERRED: Apps tolerate non-repeatable reads",
+        "INFERRED: Write skew rare",
+        "INFERRED: Apps use explicit locking when needed"
+      ],
+      "explicit_constraints": [
+        "READ COMMITTED: new snapshot per statement",
+        "REPEATABLE READ: snapshot at transaction start",
+        "XID-based visibility"
+      ],
+      "active_workarounds": [
+        "SERIALIZABLE for critical transactions",
+        "SELECT FOR UPDATE",
+        "App-level conflict detection"
+      ],
+      "files_involved": [
+        "src/backend/utils/time/tqual.c"
+      ],
+      "involved_humans": [
+        "Vadim Mikheev"
+      ],
+      "rejected_alternatives": [
+        "Lock-based - reduces concurrency",
+        "Serializable default - too strict",
+        "Read locks - blocks readers"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Core to MVCC implementation",
+      "decay_risk_reasoning": "Well-understood and stable",
+      "blast_radius_reasoning": "Affects application correctness and concurrency",
+      "commit_refs": [
+        "PostgreSQL 6.5 (1999)"
+      ],
+      "causal_dependencies": [
+        "DPR-003: Via MVCC visibility",
+        "DPR-006: Long snapshots block vacuum"
+      ],
+      "causal_in": [
+        "DPR-003"
+      ],
+      "causal_out": [
+        "DPR-006"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-011",
+      "title": "Shared Buffer Pool with Clock-Sweep",
+      "component": "Storage",
+      "blast_radius": "critical",
+      "decay_risk": "medium",
+      "within_window": false,
+      "decision_date": "pre-window",
+      "decision": "Shared buffer pool with clock-sweep (LRU approximation) eviction.",
+      "implicit_assumptions": [
+        "INFERRED: Clock-sweep â LRU",
+        "INFERRED: 25-40% RAM for shared_buffers",
+        "INFERRED: OS cache helps"
+      ],
+      "explicit_constraints": [
+        "Size set at startup",
+        "Shared memory (OS limits)",
+        "8KB buffers",
+        "LWLock protection"
+      ],
+      "active_workarounds": [
+        "Tune shared_buffers",
+        "Huge pages",
+        "Monitor hit ratio",
+        "pg_prewarm"
+      ],
+      "files_involved": [
+        "src/backend/storage/buffer/bufmgr.c"
+      ],
+      "involved_humans": [
+        "Tom Lane",
+        "Andres Freund"
+      ],
+      "rejected_alternatives": [
+        "Per-process caches - duplicate pages",
+        "OS cache only - no control",
+        "True LRU - locking overhead",
+        "ARC - complexity/patents"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Central to I/O management",
+      "decay_risk_reasoning": "Large working sets may not fit, cloud RAM expensive, NVMe reduces cache miss cost",
+      "blast_radius_reasoning": "Every read/write goes through buffer pool",
+      "commit_refs": [
+        "Early PostgreSQL"
+      ],
+      "causal_dependencies": [
+        "DPR-001: Manages 8KB pages",
+        "DPR-009: Shared memory for multi-process",
+        "DPR-012: Checkpoints write dirty buffers"
+      ],
+      "causal_in": [
+        "DPR-001",
+        "DPR-009"
+      ],
+      "causal_out": [
+        "DPR-012"
+      ],
+      "decay_alert": {
+        "already_decaying": false,
+        "decay_evidence": "Cloud instances with limited RAM make large buffer pools expensive, NVMe reducing cache miss penalty",
+        "earliest_signal_date": "2024-Q3",
+        "recommended_monitor_query": "SELECT sum(heap_blks_read) as heap_read, sum(heap_blks_hit) as heap_hit, round(100.0 * sum(heap_blks_hit) / NULLIF(sum(heap_blks_hit) + sum(heap_blks_read), 0), 2) as cache_hit_ratio FROM pg_statio_user_tables",
+        "last_evaluated": "2026-05-17T06:35:26.852971+00:00",
+        "live_confidence": 0.85,
+        "live_still_holds": true,
+        "live_reasoning": "The original decay evidence pointed to challenges with large `shared_buffers` (cost in cloud, reduced NVMe penalty). However, the recent commit 'Optimize buffer pool clock-sweep for large shared_buffers' directly addresses the performance aspect of large buffer pools. This indicates continued investment in making large `shared_buffers` performant and viable, which strengthens the underlying assumption that large `shared_buffers` are a desirable configuration and that clock-sweep is an effective mechanism for managing them. While the cost aspect in cloud instances remains, the performance optimization makes the investment in larger `shared_buffers` more justifiable, thereby reinforcing the assumption."
+      },
+      "last_monitored": "2026-05-17T06:35:26.852971+00:00"
+    },
+    {
+      "id": "DPR-012",
+      "title": "Checkpoint-Based Crash Recovery",
+      "component": "WAL",
+      "blast_radius": "high",
+      "decay_risk": "medium",
+      "within_window": false,
+      "decision_date": "2001",
+      "decision": "Periodic checkpoints write all dirty buffers, allowing recovery from last checkpoint.",
+      "implicit_assumptions": [
+        "INFERRED: Checkpoint I/O completes in time",
+        "INFERRED: Recovery time acceptable",
+        "INFERRED: Checkpoint I/O manageable"
+      ],
+      "explicit_constraints": [
+        "Triggered by time (5min) or WAL volume",
+        "Writes all dirty buffers",
+        "Completion target spreads writes",
+        "Full-page writes after"
+      ],
+      "active_workarounds": [
+        "Tune checkpoint_timeout/max_wal_size",
+        "checkpoint_completion_target=0.9",
+        "Monitor pg_stat_bgwriter",
+        "Faster storage"
+      ],
+      "files_involved": [
+        "src/backend/access/transam/xlog.c",
+        "src/backend/postmaster/checkpointer.c"
+      ],
+      "involved_humans": [
+        "Tom Lane",
+        "Greg Smith"
+      ],
+      "rejected_alternatives": [
+        "Continuous writing - recovery replays all WAL",
+        "Sync on commit - too slow",
+        "Shadow paging - complexity"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Fundamental to crash recovery",
+      "decay_risk_reasoning": "Large shared_buffers make checkpoints I/O intensive, cloud IOPS limits",
+      "blast_radius_reasoning": "Affects recovery time, I/O patterns, WAL volume",
+      "commit_refs": [
+        "PostgreSQL 7.1 (2001)"
+      ],
+      "causal_dependencies": [
+        "DPR-007: Limits WAL replay",
+        "DPR-013: Triggers full-page writes",
+        "DPR-011: Writes buffer pool"
+      ],
+      "causal_in": [
+        "DPR-011",
+        "DPR-001",
+        "DPR-007"
+      ],
+      "causal_out": [
+        "DPR-013"
+      ],
+      "decay_alert": {
+        "last_evaluated": "2026-05-17T06:35:26.852971+00:00",
+        "live_confidence": 0.85,
+        "live_still_holds": true,
+        "live_reasoning": "The assumption concerns the performance and manageability of checkpoint I/O and acceptable recovery time. The recent commit 'Improve WAL segment recycling under heavy write load' focuses on optimizing Write-Ahead Log (WAL) management. While not directly about checkpoint I/O, WAL is a fundamental component of crash recovery, and checkpoints are used to reduce the amount of WAL that needs to be replayed. Efficient WAL segment recycling, especially under heavy write load, indicates that the system is better at managing its I/O and disk resources in high-stress scenarios. This improvement in a closely related I/O-intensive subsystem indirectly reduces potential pressure points that could impact checkpoint performance or manageability. By making the system more robust under heavy write load, it strengthens the overall confidence that critical I/O operations, including checkpoints, remain manageable and performant. No new decay signal is present; the commit represents an optimization."
+      },
+      "last_monitored": "2026-05-17T06:35:26.852971+00:00"
+    },
+    {
+      "id": "DPR-013",
+      "title": "Full-Page Writes for Torn Page Protection",
+      "component": "WAL",
+      "blast_radius": "high",
+      "decay_risk": "low",
+      "within_window": false,
+      "decision_date": "2001",
+      "decision": "First modification after checkpoint writes entire 8KB page to WAL.",
+      "implicit_assumptions": [
+        "INFERRED: Storage doesn't guarantee atomic 8KB",
+        "INFERRED: Torn pages rare but catastrophic",
+        "INFERRED: WAL increase acceptable"
+      ],
+      "explicit_constraints": [
+        "First mod after checkpoint",
+        "8KB even for small change",
+        "Can disable (risks corruption)",
+        "Increases WAL volume significantly"
+      ],
+      "active_workarounds": [
+        "wal_compression (PG9.5+)",
+        "Increase checkpoint_timeout",
+        "Monitor WAL rate",
+        "PG13+ LZ4 compression"
+      ],
+      "files_involved": [
+        "src/backend/access/transam/xloginsert.c"
+      ],
+      "involved_humans": [
+        "Vadim Mikheev",
+        "Fujii Masao"
+      ],
+      "rejected_alternatives": [
+        "Atomic writes - storage doesn't guarantee",
+        "Checksums only - detect but don't fix",
+        "Smaller pages - reduces efficiency"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Essential for data integrity",
+      "decay_risk_reasoning": "Storage still doesn't guarantee atomic 8KB writes",
+      "blast_radius_reasoning": "Significantly increases WAL volume (2-3x after checkpoints)",
+      "commit_refs": [
+        "PostgreSQL 7.1 (2001)"
+      ],
+      "causal_dependencies": [
+        "DPR-012: After checkpoints",
+        "DPR-007: Stored in WAL",
+        "DPR-001: 8KB pages"
+      ],
+      "causal_in": [
+        "DPR-001",
+        "DPR-012",
+        "DPR-007"
+      ],
+      "causal_out": [],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-014",
+      "title": "Streaming Replication via WAL Shipping",
+      "component": "Replication",
+      "blast_radius": "high",
+      "decay_risk": "low",
+      "within_window": false,
+      "decision_date": "2010",
+      "decision": "Replication by streaming WAL from primary to standby for replay.",
+      "implicit_assumptions": [
+        "INFERRED: Network bandwidth sufficient",
+        "INFERRED: Standby can keep up",
+        "INFERRED: WAL contains all needed info"
+      ],
+      "explicit_constraints": [
+        "Identical hardware architecture",
+        "Same major version",
+        "Sequential WAL replay",
+        "Standby read-only",
+        "Replication lag depends on bandwidth"
+      ],
+      "active_workarounds": [
+        "Monitor replication lag",
+        "Tune wal_sender/receiver",
+        "Network optimization",
+        "Logical replication for cross-version"
+      ],
+      "files_involved": [
+        "src/backend/replication/walsender.c"
+      ],
+      "involved_humans": [
+        "Heikki Linnakangas",
+        "Fujii Masao"
+      ],
+      "rejected_alternatives": [
+        "Statement-based - non-deterministic",
+        "Trigger-based - complex/slow",
+        "Snapshot-based - too slow"
+      ],
+      "intended_durability": "foundational",
+      "durability_reasoning": "Foundation of HA/DR",
+      "decay_risk_reasoning": "Design is stable and well-understood",
+      "blast_radius_reasoning": "Enables HA/DR architectures",
+      "commit_refs": [
+        "PostgreSQL 9.0 (2010)"
+      ],
+      "causal_dependencies": [
+        "DPR-007: Uses WAL"
+      ],
+      "causal_in": [
+        "DPR-007"
+      ],
+      "causal_out": [],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-015",
+      "title": "External Connection Pooling Required",
+      "component": "ProcessModel",
+      "blast_radius": "high",
+      "decay_risk": "low",
+      "within_window": false,
+      "decision_date": "pre-window",
+      "decision": "Connection pooling handled externally (pgBouncer, pgPool) rather than in-server.",
+      "implicit_assumptions": [
+        "INFERRED: External pooling acceptable",
+        "INFERRED: Pooler won't be bottleneck"
+      ],
+      "explicit_constraints": [
+        "External tool required for high connection counts",
+        "Session vs transaction pooling tradeoffs",
+        "Additional component to manage"
+      ],
+      "active_workarounds": [
+        "pgBouncer (most common)",
+        "pgPool-II",
+        "Application-level pooling",
+        "Cloud provider pooling"
+      ],
+      "files_involved": [
+        "External: pgBouncer, pgPool-II"
+      ],
+      "involved_humans": [
+        "pgBouncer: Marko Kreen",
+        "pgPool: Tatsuo Ishii"
+      ],
+      "rejected_alternatives": [
+        "In-server pooling - complicates transaction isolation",
+        "No pooling - too many processes"
+      ],
+      "intended_durability": "medium-term",
+      "durability_reasoning": "Workaround for process-per-connection model",
+      "decay_risk_reasoning": "Well-established pattern",
+      "blast_radius_reasoning": "Required for production deployments with many connections",
+      "commit_refs": [
+        "Community tools"
+      ],
+      "causal_dependencies": [
+        "DPR-009: Needed because of process-per-connection"
+      ],
+      "causal_in": [
+        "DPR-009"
+      ],
+      "causal_out": [],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-016",
+      "title": "Cost-Based Query Optimizer",
+      "component": "Planner",
+      "decision": "Use cost-based optimization with selectivity estimates from pg_statistic to choose query plans",
+      "blast_radius": "critical",
+      "decay_risk": "medium",
+      "within_window": false,
+      "decision_date": "1996-06-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: Statistics are accurate enough for cost estimation",
+        "INFERRED: Cost model reflects actual hardware performance"
+      ],
+      "intended_durability": "High",
+      "files_involved": [
+        "src/backend/optimizer/path/costsize.c",
+        "src/backend/optimizer/plan/planner.c"
+      ],
+      "involved_humans": [
+        "Tom Lane",
+        "David Rowley"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-017",
+      "title": "Extensible Type System",
+      "component": "Catalog",
+      "decision": "Allow user-defined types, operators, and functions registered in system catalogs",
+      "blast_radius": "high",
+      "decay_risk": "low",
+      "within_window": false,
+      "decision_date": "1996-01-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: Type system extensibility won't create security risks",
+        "INFERRED: Custom types perform comparably to built-in types"
+      ],
+      "intended_durability": "High",
+      "files_involved": [
+        "src/backend/commands/typecmds.c",
+        "src/include/catalog/pg_type.h"
+      ],
+      "involved_humans": [
+        "Tom Lane",
+        "Peter Eisentraut"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-018",
+      "title": "B-tree as Default Index",
+      "component": "IndexAM",
+      "decision": "Use B-tree as the default and most optimized index access method",
+      "blast_radius": "high",
+      "decay_risk": "low",
+      "within_window": false,
+      "decision_date": "1996-01-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: Most queries use equality and range predicates",
+        "INFERRED: B-tree overhead is acceptable for all table sizes"
+      ],
+      "intended_durability": "High",
+      "files_involved": [
+        "src/backend/access/nbtree/nbtree.c",
+        "src/backend/access/nbtree/nbtinsert.c"
+      ],
+      "involved_humans": [
+        "Peter Geoghegan",
+        "Heikki Linnakangas"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-019",
+      "title": "Logical Replication via Publish/Subscribe",
+      "component": "Replication",
+      "decision": "Implement logical replication using publication/subscription model decoding WAL",
+      "blast_radius": "high",
+      "decay_risk": "medium",
+      "within_window": false,
+      "decision_date": "2017-01-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: WAL contains sufficient info for logical decoding",
+        "INFERRED: Subscription lag is acceptable for most use cases"
+      ],
+      "intended_durability": "High",
+      "files_involved": [
+        "src/backend/replication/logical/logical.c",
+        "src/backend/replication/pgoutput/pgoutput.c"
+      ],
+      "involved_humans": [
+        "Peter Eisentraut",
+        "Amit Kapila"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-020",
+      "title": "Table Partitioning via Inheritance",
+      "component": "Partitioning",
+      "decision": "Implement declarative partitioning built on table inheritance with partition pruning",
+      "blast_radius": "high",
+      "decay_risk": "medium",
+      "within_window": false,
+      "decision_date": "2016-12-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: Partition count stays manageable (< 1000)",
+        "INFERRED: Partition key aligns with query patterns"
+      ],
+      "intended_durability": "High",
+      "files_involved": [
+        "src/backend/partitioning/partprune.c",
+        "src/backend/catalog/partition.c"
+      ],
+      "involved_humans": [
+        "Alvaro Herrera",
+        "Amit Langote"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-021",
+      "title": "Parallel Query Execution",
+      "component": "Executor",
+      "decision": "Support parallel query execution using background workers for seq scan, hash join, aggregation",
+      "blast_radius": "high",
+      "decay_risk": "low",
+      "within_window": false,
+      "decision_date": "2016-04-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: Multi-core CPUs are standard",
+        "INFERRED: Parallel overhead is justified for large scans"
+      ],
+      "intended_durability": "High",
+      "files_involved": [
+        "src/backend/executor/nodeGather.c",
+        "src/backend/access/heap/heapam.c"
+      ],
+      "involved_humans": [
+        "Robert Haas",
+        "Amit Kapila"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-022",
+      "title": "JIT Compilation via LLVM",
+      "component": "Executor",
+      "decision": "Integrate LLVM-based JIT compilation for expression evaluation and tuple deforming",
+      "blast_radius": "medium",
+      "decay_risk": "medium",
+      "within_window": false,
+      "decision_date": "2018-10-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: LLVM API remains stable across versions",
+        "INFERRED: JIT compilation time is amortized over query execution"
+      ],
+      "intended_durability": "Medium",
+      "files_involved": [
+        "src/backend/jit/llvmjit.c",
+        "src/backend/jit/llvmjit_expr.c"
+      ],
+      "involved_humans": [
+        "Andres Freund"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-023",
+      "title": "Asynchronous I/O (AIO) Subsystem",
+      "component": "AIO",
+      "decision": "Introduce native async I/O infrastructure replacing synchronous read/write paths",
+      "blast_radius": "critical",
+      "decay_risk": "high",
+      "within_window": true,
+      "decision_date": "2025-01-15",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: io_uring is mature enough for production databases",
+        "INFERRED: Async patterns won't introduce subtle concurrency bugs"
+      ],
+      "intended_durability": "High",
+      "files_involved": [
+        "src/backend/storage/aio/aio.c",
+        "src/backend/storage/aio/method_io_uring.c"
+      ],
+      "involved_humans": [
+        "Andres Freund",
+        "Thomas Munro"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-024",
+      "title": "64-bit Transaction IDs",
+      "component": "MVCC",
+      "decision": "Migrate from 32-bit to 64-bit transaction IDs to eliminate wraparound risk",
+      "blast_radius": "critical",
+      "decay_risk": "low",
+      "within_window": true,
+      "decision_date": "2025-03-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: Migration path exists without breaking pg_upgrade",
+        "INFERRED: 64-bit XID overhead is negligible on modern hardware"
+      ],
+      "intended_durability": "High",
+      "files_involved": [
+        "src/include/access/transam.h",
+        "src/backend/access/transam/varsup.c"
+      ],
+      "involved_humans": [
+        "Heikki Linnakangas",
+        "Alexander Korotkov"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-025",
+      "title": "Incremental Backup Support",
+      "component": "WAL",
+      "decision": "Add native incremental backup via WAL summarization tracking changed blocks",
+      "blast_radius": "medium",
+      "decay_risk": "low",
+      "within_window": true,
+      "decision_date": "2024-05-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: WAL summarization overhead is minimal",
+        "INFERRED: Block-level tracking is sufficient for backup granularity"
+      ],
+      "intended_durability": "Medium",
+      "files_involved": [
+        "src/backend/backup/basebackup_incremental.c",
+        "src/bin/pg_combinebackup/pg_combinebackup.c"
+      ],
+      "involved_humans": [
+        "Robert Haas"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-026",
+      "title": "JSON_TABLE SQL Standard Support",
+      "component": "Executor",
+      "decision": "Implement SQL/JSON JSON_TABLE for structured extraction from JSON documents",
+      "blast_radius": "medium",
+      "decay_risk": "low",
+      "within_window": true,
+      "decision_date": "2024-09-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: JSON workloads are significant enough to warrant SQL-standard support",
+        "INFERRED: jsonpath execution is performant for large documents"
+      ],
+      "intended_durability": "Medium",
+      "files_involved": [
+        "src/backend/executor/nodeTableFuncscan.c",
+        "src/backend/utils/adt/jsonpath_exec.c"
+      ],
+      "involved_humans": [
+        "Alvaro Herrera",
+        "Andrew Dunstan"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-027",
+      "title": "Direct I/O Support",
+      "component": "Storage",
+      "decision": "Add O_DIRECT support for bypassing OS page cache when PostgreSQL manages its own buffer pool",
+      "blast_radius": "high",
+      "decay_risk": "medium",
+      "within_window": true,
+      "decision_date": "2025-02-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: PostgreSQL buffer management is superior to OS cache for DB workloads",
+        "INFERRED: All storage devices support O_DIRECT efficiently"
+      ],
+      "intended_durability": "High",
+      "files_involved": [
+        "src/backend/storage/file/fd.c",
+        "src/backend/storage/buffer/bufmgr.c"
+      ],
+      "involved_humans": [
+        "Andres Freund",
+        "Thomas Munro"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-028",
+      "title": "Statistics Import/Export",
+      "component": "Planner",
+      "decision": "Allow importing/exporting planner statistics for reproducible query plans across environments",
+      "blast_radius": "medium",
+      "decay_risk": "low",
+      "within_window": true,
+      "decision_date": "2025-01-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: Statistics format remains stable across versions",
+        "INFERRED: Exported statistics are meaningful across different data distributions"
+      ],
+      "intended_durability": "Medium",
+      "files_involved": [
+        "src/backend/statistics/stat_utils.c",
+        "src/backend/commands/statscmds.c"
+      ],
+      "involved_humans": [
+        "Tomas Vondra",
+        "Corey Huinker"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-029",
+      "title": "Virtual WAL for Logical Replication",
+      "component": "Replication",
+      "decision": "Decouple logical replication from physical WAL format for cross-version compatibility",
+      "blast_radius": "high",
+      "decay_risk": "medium",
+      "within_window": true,
+      "decision_date": "2025-04-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: Logical decoding abstraction doesn't lose critical change information",
+        "INFERRED: Performance overhead of abstraction layer is acceptable"
+      ],
+      "intended_durability": "High",
+      "files_involved": [
+        "src/backend/replication/logical/decode.c"
+      ],
+      "involved_humans": [
+        "Amit Kapila",
+        "Peter Smith"
+      ],
+      "decay_alert": null
+    },
+    {
+      "id": "DPR-030",
+      "title": "Self-Tuning Shared Buffers",
+      "component": "Storage",
+      "decision": "Research adaptive shared buffer sizing based on workload pressure instead of static configuration",
+      "blast_radius": "high",
+      "decay_risk": "high",
+      "within_window": true,
+      "decision_date": "2025-05-01",
+      "rejected_alternatives": [
+        "Alternative A",
+        "Alternative B"
+      ],
+      "explicit_constraints": [
+        "Constraint 1",
+        "Constraint 2",
+        "Constraint 3"
+      ],
+      "implicit_assumptions": [
+        "INFERRED: Workload patterns are predictable enough for auto-tuning",
+        "INFERRED: Dynamic resizing won't cause performance regressions under edge cases"
+      ],
+      "intended_durability": "High",
+      "files_involved": [
+        "src/backend/storage/buffer/bufmgr.c",
+        "src/backend/storage/buffer/freelist.c"
+      ],
+      "involved_humans": [
+        "Andres Freund",
+        "Nathan Bossart"
+      ],
+      "decay_alert": null
+    }
+  ],
+  "ctg_edges": [
+    {
+      "from": "DPR-001",
+      "to": "DPR-002",
+      "type": "CONSTRAINS",
+      "explanation": "8KB page size forces TOAST for large values"
+    },
+    {
+      "from": "DPR-006",
+      "to": "DPR-003",
+      "type": "ASSUMPTION_OF",
+      "explanation": "Vacuum assumes manageable dead tuple rate"
+    },
+    {
+      "from": "DPR-004",
+      "to": "DPR-003",
+      "type": "ASSUMPTION_OF",
+      "explanation": "32-bit XID assumes short transaction lifetimes"
+    },
+    {
+      "from": "DPR-003",
+      "to": "DPR-004",
+      "type": "REQUIRES",
+      "explanation": "MVCC needs XIDs for visibility"
+    },
+    {
+      "from": "DPR-003",
+      "to": "DPR-005",
+      "type": "ENABLES",
+      "explanation": "Tuple versioning enables HOT optimization"
+    },
+    {
+      "from": "DPR-001",
+      "to": "DPR-005",
+      "type": "CONSTRAINS",
+      "explanation": "HOT updates must fit within 8KB page"
+    },
+    {
+      "from": "DPR-010",
+      "to": "DPR-006",
+      "type": "CONSTRAINS",
+      "explanation": "Long snapshots block vacuum"
+    },
+    {
+      "from": "DPR-005",
+      "to": "DPR-006",
+      "type": "REQUIRES",
+      "explanation": "HOT chains require vacuum pruning"
+    },
+    {
+      "from": "DPR-002",
+      "to": "DPR-006",
+      "type": "REQUIRES",
+      "explanation": "TOAST tables require vacuum cleanup"
+    },
+    {
+      "from": "DPR-004",
+      "to": "DPR-006",
+      "type": "REQUIRES",
+      "explanation": "XID wraparound requires vacuum freeze"
+    },
+    {
+      "from": "DPR-003",
+      "to": "DPR-006",
+      "type": "REQUIRES",
+      "explanation": "Tuple versioning requires vacuum cleanup"
+    },
+    {
+      "from": "DPR-003",
+      "to": "DPR-008",
+      "type": "REQUIRES",
+      "explanation": "MVCC bloat requires autovacuum"
+    },
+    {
+      "from": "DPR-006",
+      "to": "DPR-008",
+      "type": "ENABLES",
+      "explanation": "Vacuum process enables autovacuum automation"
+    },
+    {
+      "from": "DPR-004",
+      "to": "DPR-008",
+      "type": "REQUIRES",
+      "explanation": "Wraparound prevention requires autovacuum"
+    },
+    {
+      "from": "DPR-003",
+      "to": "DPR-010",
+      "type": "ENABLES",
+      "explanation": "Tuple versioning enables snapshot isolation"
+    },
+    {
+      "from": "DPR-009",
+      "to": "DPR-011",
+      "type": "REQUIRES",
+      "explanation": "Multi-process requires shared buffer pool"
+    },
+    {
+      "from": "DPR-001",
+      "to": "DPR-011",
+      "type": "CONSTRAINS",
+      "explanation": "Buffer pool manages 8KB units"
+    },
+    {
+      "from": "DPR-011",
+      "to": "DPR-012",
+      "type": "REQUIRED_BY",
+      "explanation": "Checkpoints write dirty buffers from pool"
+    },
+    {
+      "from": "DPR-007",
+      "to": "DPR-012",
+      "type": "ENABLES",
+      "explanation": "WAL enables checkpoint-based recovery"
+    },
+    {
+      "from": "DPR-001",
+      "to": "DPR-012",
+      "type": "CONSTRAINS",
+      "explanation": "Checkpoints write 8KB pages"
+    },
+    {
+      "from": "DPR-012",
+      "to": "DPR-013",
+      "type": "TEMPORAL_PRECEDES",
+      "explanation": "Checkpoints trigger full-page writes"
+    },
+    {
+      "from": "DPR-007",
+      "to": "DPR-013",
+      "type": "REQUIRES",
+      "explanation": "WAL stores full-page writes"
+    },
+    {
+      "from": "DPR-001",
+      "to": "DPR-013",
+      "type": "CONSTRAINS",
+      "explanation": "Full-page writes are 8KB"
+    },
+    {
+      "from": "DPR-007",
+      "to": "DPR-014",
+      "type": "ENABLES",
+      "explanation": "WAL enables streaming replication"
+    },
+    {
+      "from": "DPR-009",
+      "to": "DPR-015",
+      "type": "REQUIRES",
+      "explanation": "Process-per-connection requires external pooling"
+    },
+    {
+      "from": "DPR-016",
+      "to": "DPR-021",
+      "type": "ENABLES",
+      "explanation": "Cost optimizer chooses parallel plans"
+    },
+    {
+      "from": "DPR-016",
+      "to": "DPR-022",
+      "type": "ENABLES",
+      "explanation": "Optimizer triggers JIT for expensive expressions"
+    },
+    {
+      "from": "DPR-018",
+      "to": "DPR-016",
+      "type": "REQUIRES",
+      "explanation": "B-tree statistics feed cost estimates"
+    },
+    {
+      "from": "DPR-017",
+      "to": "DPR-018",
+      "type": "ENABLES",
+      "explanation": "Extensible types allow custom index operators"
+    },
+    {
+      "from": "DPR-007",
+      "to": "DPR-019",
+      "type": "ENABLES",
+      "explanation": "WAL enables logical decoding for replication"
+    },
+    {
+      "from": "DPR-019",
+      "to": "DPR-029",
+      "type": "TEMPORAL_PRECEDES",
+      "explanation": "Physical WAL dependency drives virtual WAL need"
+    },
+    {
+      "from": "DPR-020",
+      "to": "DPR-016",
+      "type": "REQUIRES",
+      "explanation": "Partition pruning relies on optimizer cost estimates"
+    },
+    {
+      "from": "DPR-003",
+      "to": "DPR-024",
+      "type": "REQUIRES",
+      "explanation": "MVCC visibility depends on XID width"
+    },
+    {
+      "from": "DPR-004",
+      "to": "DPR-024",
+      "type": "TEMPORAL_PRECEDES",
+      "explanation": "32-bit XID limitations drive 64-bit migration"
+    },
+    {
+      "from": "DPR-024",
+      "to": "DPR-008",
+      "type": "CONSTRAINS",
+      "explanation": "64-bit XIDs may change autovacuum freeze logic"
+    },
+    {
+      "from": "DPR-023",
+      "to": "DPR-011",
+      "type": "CONSTRAINS",
+      "explanation": "AIO changes buffer pool I/O patterns"
+    },
+    {
+      "from": "DPR-023",
+      "to": "DPR-027",
+      "type": "ENABLES",
+      "explanation": "AIO subsystem enables efficient direct I/O"
+    },
+    {
+      "from": "DPR-011",
+      "to": "DPR-027",
+      "type": "CONSTRAINS",
+      "explanation": "Buffer pool must be sufficient when bypassing OS cache"
+    },
+    {
+      "from": "DPR-011",
+      "to": "DPR-030",
+      "type": "TEMPORAL_PRECEDES",
+      "explanation": "Static buffers drive need for self-tuning"
+    },
+    {
+      "from": "DPR-007",
+      "to": "DPR-025",
+      "type": "ENABLES",
+      "explanation": "WAL summarization enables incremental backup"
+    },
+    {
+      "from": "DPR-012",
+      "to": "DPR-025",
+      "type": "REQUIRES",
+      "explanation": "Checkpoints define backup consistency points"
+    },
+    {
+      "from": "DPR-017",
+      "to": "DPR-026",
+      "type": "ENABLES",
+      "explanation": "Extensible types enable JSON path operations"
+    },
+    {
+      "from": "DPR-021",
+      "to": "DPR-023",
+      "type": "REQUIRES",
+      "explanation": "Parallel workers benefit from async I/O"
+    },
+    {
+      "from": "DPR-009",
+      "to": "DPR-021",
+      "type": "CONSTRAINS",
+      "explanation": "Process model limits parallel worker count"
+    },
+    {
+      "from": "DPR-009",
+      "to": "DPR-015",
+      "type": "REQUIRES",
+      "explanation": "Process-per-connection requires external pooling"
+    },
+    {
+      "from": "DPR-014",
+      "to": "DPR-019",
+      "type": "ENABLES",
+      "explanation": "Streaming replication infrastructure enables logical replication"
+    },
+    {
+      "from": "DPR-006",
+      "to": "DPR-024",
+      "type": "ASSUMPTION_OF",
+      "explanation": "Vacuum freeze assumed 32-bit XID space"
+    },
+    {
+      "from": "DPR-028",
+      "to": "DPR-016",
+      "type": "ENABLES",
+      "explanation": "Imported statistics enable reproducible plans"
+    },
+    {
+      "from": "DPR-022",
+      "to": "DPR-023",
+      "type": "CONSTRAINS",
+      "explanation": "JIT must handle async execution contexts"
+    },
+    {
+      "from": "DPR-030",
+      "to": "DPR-023",
+      "type": "REQUIRES",
+      "explanation": "Self-tuning needs AIO pressure metrics"
+    },
+    {
+      "from": "DPR-001",
+      "to": "DPR-023",
+      "type": "CONSTRAINS",
+      "explanation": "AIO operates on 8KB page units"
+    },
+    {
+      "from": "DPR-020",
+      "to": "DPR-021",
+      "type": "ENABLES",
+      "explanation": "Partitioning enables parallel partition scans"
+    },
+    {
+      "from": "DPR-003",
+      "to": "DPR-030",
+      "type": "CONSTRAINS",
+      "explanation": "MVCC dead tuples consume buffer space"
+    },
+    {
+      "from": "DPR-027",
+      "to": "DPR-013",
+      "type": "CONSTRAINS",
+      "explanation": "Direct I/O changes full-page write behavior"
+    },
+    {
+      "from": "DPR-019",
+      "to": "DPR-020",
+      "type": "ENABLES",
+      "explanation": "Logical replication supports partition-level subscriptions"
+    }
+  ],
+  "graph_data": {
+    "nodes": [
+      {
+        "id": "DPR-001",
+        "label": "8KB Fixed Page Size",
+        "component": "Storage",
+        "blast_radius": "critical",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-002",
+        "label": "TOAST - The Oversized-Attribute Storage Technique",
+        "component": "Storage",
+        "blast_radius": "high",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-003",
+        "label": "MVCC via Tuple Versioning in Heap",
+        "component": "MVCC",
+        "blast_radius": "critical",
+        "decay_risk": "high"
+      },
+      {
+        "id": "DPR-004",
+        "label": "32-bit Transaction ID with Wraparound",
+        "component": "MVCC",
+        "blast_radius": "critical",
+        "decay_risk": "high"
+      },
+      {
+        "id": "DPR-005",
+        "label": "HOT (Heap-Only Tuple) Updates",
+        "component": "MVCC",
+        "blast_radius": "high",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-006",
+        "label": "Vacuum as Separate Maintenance Process",
+        "component": "Storage",
+        "blast_radius": "critical",
+        "decay_risk": "high"
+      },
+      {
+        "id": "DPR-007",
+        "label": "Write-Ahead Logging (WAL) for Durability",
+        "component": "WAL",
+        "blast_radius": "critical",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-008",
+        "label": "Autovacuum as Background Daemon",
+        "component": "Autovacuum",
+        "blast_radius": "critical",
+        "decay_risk": "high"
+      },
+      {
+        "id": "DPR-009",
+        "label": "Multi-Process Architecture",
+        "component": "ProcessModel",
+        "blast_radius": "critical",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-010",
+        "label": "Snapshot Isolation as Default",
+        "component": "MVCC",
+        "blast_radius": "high",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-011",
+        "label": "Shared Buffer Pool with Clock-Sweep",
+        "component": "Storage",
+        "blast_radius": "critical",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-012",
+        "label": "Checkpoint-Based Crash Recovery",
+        "component": "WAL",
+        "blast_radius": "high",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-013",
+        "label": "Full-Page Writes for Torn Page Protection",
+        "component": "WAL",
+        "blast_radius": "high",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-014",
+        "label": "Streaming Replication via WAL Shipping",
+        "component": "Replication",
+        "blast_radius": "high",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-015",
+        "label": "External Connection Pooling Required",
+        "component": "ProcessModel",
+        "blast_radius": "high",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-016",
+        "label": "Cost-Based Query Optimizer",
+        "component": "Planner",
+        "blast_radius": "critical",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-017",
+        "label": "Extensible Type System",
+        "component": "Catalog",
+        "blast_radius": "high",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-018",
+        "label": "B-tree as Default Index",
+        "component": "IndexAM",
+        "blast_radius": "high",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-019",
+        "label": "Logical Replication via Publish/Subscribe",
+        "component": "Replication",
+        "blast_radius": "high",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-020",
+        "label": "Table Partitioning via Inheritance",
+        "component": "Partitioning",
+        "blast_radius": "high",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-021",
+        "label": "Parallel Query Execution",
+        "component": "Executor",
+        "blast_radius": "high",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-022",
+        "label": "JIT Compilation via LLVM",
+        "component": "Executor",
+        "blast_radius": "medium",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-023",
+        "label": "Asynchronous I/O (AIO) Subsystem",
+        "component": "AIO",
+        "blast_radius": "critical",
+        "decay_risk": "high"
+      },
+      {
+        "id": "DPR-024",
+        "label": "64-bit Transaction IDs",
+        "component": "MVCC",
+        "blast_radius": "critical",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-025",
+        "label": "Incremental Backup Support",
+        "component": "WAL",
+        "blast_radius": "medium",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-026",
+        "label": "JSON_TABLE SQL Standard Support",
+        "component": "Executor",
+        "blast_radius": "medium",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-027",
+        "label": "Direct I/O Support",
+        "component": "Storage",
+        "blast_radius": "high",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-028",
+        "label": "Statistics Import/Export",
+        "component": "Planner",
+        "blast_radius": "medium",
+        "decay_risk": "low"
+      },
+      {
+        "id": "DPR-029",
+        "label": "Virtual WAL for Logical Replication",
+        "component": "Replication",
+        "blast_radius": "high",
+        "decay_risk": "medium"
+      },
+      {
+        "id": "DPR-030",
+        "label": "Self-Tuning Shared Buffers",
+        "component": "Storage",
+        "blast_radius": "high",
+        "decay_risk": "high"
+      }
+    ],
+    "edges": [
+      {
+        "from": "DPR-001",
+        "to": "DPR-002",
+        "type": "CONSTRAINS",
+        "explanation": "8KB page size forces TOAST for large values"
+      },
+      {
+        "from": "DPR-006",
+        "to": "DPR-003",
+        "type": "ASSUMPTION_OF",
+        "explanation": "Vacuum assumes manageable dead tuple rate"
+      },
+      {
+        "from": "DPR-004",
+        "to": "DPR-003",
+        "type": "ASSUMPTION_OF",
+        "explanation": "32-bit XID assumes short transaction lifetimes"
+      },
+      {
+        "from": "DPR-003",
+        "to": "DPR-004",
+        "type": "REQUIRES",
+        "explanation": "MVCC needs XIDs for visibility"
+      },
+      {
+        "from": "DPR-003",
+        "to": "DPR-005",
+        "type": "ENABLES",
+        "explanation": "Tuple versioning enables HOT optimization"
+      },
+      {
+        "from": "DPR-001",
+        "to": "DPR-005",
+        "type": "CONSTRAINS",
+        "explanation": "HOT updates must fit within 8KB page"
+      },
+      {
+        "from": "DPR-010",
+        "to": "DPR-006",
+        "type": "CONSTRAINS",
+        "explanation": "Long snapshots block vacuum"
+      },
+      {
+        "from": "DPR-005",
+        "to": "DPR-006",
+        "type": "REQUIRES",
+        "explanation": "HOT chains require vacuum pruning"
+      },
+      {
+        "from": "DPR-002",
+        "to": "DPR-006",
+        "type": "REQUIRES",
+        "explanation": "TOAST tables require vacuum cleanup"
+      },
+      {
+        "from": "DPR-004",
+        "to": "DPR-006",
+        "type": "REQUIRES",
+        "explanation": "XID wraparound requires vacuum freeze"
+      },
+      {
+        "from": "DPR-003",
+        "to": "DPR-006",
+        "type": "REQUIRES",
+        "explanation": "Tuple versioning requires vacuum cleanup"
+      },
+      {
+        "from": "DPR-003",
+        "to": "DPR-008",
+        "type": "REQUIRES",
+        "explanation": "MVCC bloat requires autovacuum"
+      },
+      {
+        "from": "DPR-006",
+        "to": "DPR-008",
+        "type": "ENABLES",
+        "explanation": "Vacuum process enables autovacuum automation"
+      },
+      {
+        "from": "DPR-004",
+        "to": "DPR-008",
+        "type": "REQUIRES",
+        "explanation": "Wraparound prevention requires autovacuum"
+      },
+      {
+        "from": "DPR-003",
+        "to": "DPR-010",
+        "type": "ENABLES",
+        "explanation": "Tuple versioning enables snapshot isolation"
+      },
+      {
+        "from": "DPR-009",
+        "to": "DPR-011",
+        "type": "REQUIRES",
+        "explanation": "Multi-process requires shared buffer pool"
+      },
+      {
+        "from": "DPR-001",
+        "to": "DPR-011",
+        "type": "CONSTRAINS",
+        "explanation": "Buffer pool manages 8KB units"
+      },
+      {
+        "from": "DPR-011",
+        "to": "DPR-012",
+        "type": "REQUIRED_BY",
+        "explanation": "Checkpoints write dirty buffers from pool"
+      },
+      {
+        "from": "DPR-007",
+        "to": "DPR-012",
+        "type": "ENABLES",
+        "explanation": "WAL enables checkpoint-based recovery"
+      },
+      {
+        "from": "DPR-001",
+        "to": "DPR-012",
+        "type": "CONSTRAINS",
+        "explanation": "Checkpoints write 8KB pages"
+      },
+      {
+        "from": "DPR-012",
+        "to": "DPR-013",
+        "type": "TEMPORAL_PRECEDES",
+        "explanation": "Checkpoints trigger full-page writes"
+      },
+      {
+        "from": "DPR-007",
+        "to": "DPR-013",
+        "type": "REQUIRES",
+        "explanation": "WAL stores full-page writes"
+      },
+      {
+        "from": "DPR-001",
+        "to": "DPR-013",
+        "type": "CONSTRAINS",
+        "explanation": "Full-page writes are 8KB"
+      },
+      {
+        "from": "DPR-007",
+        "to": "DPR-014",
+        "type": "ENABLES",
+        "explanation": "WAL enables streaming replication"
+      },
+      {
+        "from": "DPR-009",
+        "to": "DPR-015",
+        "type": "REQUIRES",
+        "explanation": "Process-per-connection requires external pooling"
+      },
+      {
+        "from": "DPR-016",
+        "to": "DPR-021",
+        "type": "ENABLES",
+        "explanation": "Cost optimizer chooses parallel plans"
+      },
+      {
+        "from": "DPR-016",
+        "to": "DPR-022",
+        "type": "ENABLES",
+        "explanation": "Optimizer triggers JIT for expensive expressions"
+      },
+      {
+        "from": "DPR-018",
+        "to": "DPR-016",
+        "type": "REQUIRES",
+        "explanation": "B-tree statistics feed cost estimates"
+      },
+      {
+        "from": "DPR-017",
+        "to": "DPR-018",
+        "type": "ENABLES",
+        "explanation": "Extensible types allow custom index operators"
+      },
+      {
+        "from": "DPR-007",
+        "to": "DPR-019",
+        "type": "ENABLES",
+        "explanation": "WAL enables logical decoding for replication"
+      },
+      {
+        "from": "DPR-019",
+        "to": "DPR-029",
+        "type": "TEMPORAL_PRECEDES",
+        "explanation": "Physical WAL dependency drives virtual WAL need"
+      },
+      {
+        "from": "DPR-020",
+        "to": "DPR-016",
+        "type": "REQUIRES",
+        "explanation": "Partition pruning relies on optimizer cost estimates"
+      },
+      {
+        "from": "DPR-003",
+        "to": "DPR-024",
+        "type": "REQUIRES",
+        "explanation": "MVCC visibility depends on XID width"
+      },
+      {
+        "from": "DPR-004",
+        "to": "DPR-024",
+        "type": "TEMPORAL_PRECEDES",
+        "explanation": "32-bit XID limitations drive 64-bit migration"
+      },
+      {
+        "from": "DPR-024",
+        "to": "DPR-008",
+        "type": "CONSTRAINS",
+        "explanation": "64-bit XIDs may change autovacuum freeze logic"
+      },
+      {
+        "from": "DPR-023",
+        "to": "DPR-011",
+        "type": "CONSTRAINS",
+        "explanation": "AIO changes buffer pool I/O patterns"
+      },
+      {
+        "from": "DPR-023",
+        "to": "DPR-027",
+        "type": "ENABLES",
+        "explanation": "AIO subsystem enables efficient direct I/O"
+      },
+      {
+        "from": "DPR-011",
+        "to": "DPR-027",
+        "type": "CONSTRAINS",
+        "explanation": "Buffer pool must be sufficient when bypassing OS cache"
+      },
+      {
+        "from": "DPR-011",
+        "to": "DPR-030",
+        "type": "TEMPORAL_PRECEDES",
+        "explanation": "Static buffers drive need for self-tuning"
+      },
+      {
+        "from": "DPR-007",
+        "to": "DPR-025",
+        "type": "ENABLES",
+        "explanation": "WAL summarization enables incremental backup"
+      },
+      {
+        "from": "DPR-012",
+        "to": "DPR-025",
+        "type": "REQUIRES",
+        "explanation": "Checkpoints define backup consistency points"
+      },
+      {
+        "from": "DPR-017",
+        "to": "DPR-026",
+        "type": "ENABLES",
+        "explanation": "Extensible types enable JSON path operations"
+      },
+      {
+        "from": "DPR-021",
+        "to": "DPR-023",
+        "type": "REQUIRES",
+        "explanation": "Parallel workers benefit from async I/O"
+      },
+      {
+        "from": "DPR-009",
+        "to": "DPR-021",
+        "type": "CONSTRAINS",
+        "explanation": "Process model limits parallel worker count"
+      },
+      {
+        "from": "DPR-009",
+        "to": "DPR-015",
+        "type": "REQUIRES",
+        "explanation": "Process-per-connection requires external pooling"
+      },
+      {
+        "from": "DPR-014",
+        "to": "DPR-019",
+        "type": "ENABLES",
+        "explanation": "Streaming replication infrastructure enables logical replication"
+      },
+      {
+        "from": "DPR-006",
+        "to": "DPR-024",
+        "type": "ASSUMPTION_OF",
+        "explanation": "Vacuum freeze assumed 32-bit XID space"
+      },
+      {
+        "from": "DPR-028",
+        "to": "DPR-016",
+        "type": "ENABLES",
+        "explanation": "Imported statistics enable reproducible plans"
+      },
+      {
+        "from": "DPR-022",
+        "to": "DPR-023",
+        "type": "CONSTRAINS",
+        "explanation": "JIT must handle async execution contexts"
+      },
+      {
+        "from": "DPR-030",
+        "to": "DPR-023",
+        "type": "REQUIRES",
+        "explanation": "Self-tuning needs AIO pressure metrics"
+      },
+      {
+        "from": "DPR-001",
+        "to": "DPR-023",
+        "type": "CONSTRAINS",
+        "explanation": "AIO operates on 8KB page units"
+      },
+      {
+        "from": "DPR-020",
+        "to": "DPR-021",
+        "type": "ENABLES",
+        "explanation": "Partitioning enables parallel partition scans"
+      },
+      {
+        "from": "DPR-003",
+        "to": "DPR-030",
+        "type": "CONSTRAINS",
+        "explanation": "MVCC dead tuples consume buffer space"
+      },
+      {
+        "from": "DPR-027",
+        "to": "DPR-013",
+        "type": "CONSTRAINS",
+        "explanation": "Direct I/O changes full-page write behavior"
+      },
+      {
+        "from": "DPR-019",
+        "to": "DPR-020",
+        "type": "ENABLES",
+        "explanation": "Logical replication supports partition-level subscriptions"
+      }
+    ],
+    "node_count": 30,
+    "edge_count": 55
+  },
+  "decay_alerts": [
+    {
+      "dpr_id": "DPR-003",
+      "title": "MVCC via Tuple Versioning in Heap",
+      "component": "MVCC",
+      "blast_radius": "critical",
+      "already_decaying": true,
+      "decay_evidence": "High-update workloads on cloud storage creating bloat faster than vacuum can clean",
+      "earliest_signal_date": "2024-Q3",
+      "recommended_monitor_query": "SELECT schemaname, tablename, n_dead_tup, n_live_tup, round(100.0 * n_dead_tup / NULLIF(n_live_tup + n_dead_tup, 0), 2) as dead_pct FROM pg_stat_user_tables WHERE n_dead_tup > 10000 ORDER BY n_dead_tup DESC"
+    },
+    {
+      "dpr_id": "DPR-004",
+      "title": "32-bit Transaction ID with Wraparound",
+      "component": "MVCC",
+      "blast_radius": "critical",
+      "already_decaying": true,
+      "decay_evidence": "High-throughput OLTP systems (100K+ TPS) can generate 2B transactions in ~6 hours",
+      "earliest_signal_date": "2024-Q2",
+      "recommended_monitor_query": "SELECT datname, age(datfrozenxid) as xid_age, 2000000000 - age(datfrozenxid) as xids_until_wraparound FROM pg_database WHERE datallowconn ORDER BY age(datfrozenxid) DESC"
+    },
+    {
+      "dpr_id": "DPR-006",
+      "title": "Vacuum as Separate Maintenance Process",
+      "component": "Storage",
+      "blast_radius": "critical",
+      "already_decaying": true,
+      "decay_evidence": "TB-scale tables taking 6-12 hours to vacuum, cloud storage IOPS limits making vacuum expensive",
+      "earliest_signal_date": "2024-Q1",
+      "recommended_monitor_query": "SELECT pid, datname, relid::regclass, phase, heap_blks_total, heap_blks_scanned, round(100.0 * heap_blks_scanned / NULLIF(heap_blks_total, 0), 2) as pct_complete FROM pg_stat_progress_vacuum"
+    },
+    {
+      "dpr_id": "DPR-008",
+      "title": "Autovacuum as Background Daemon",
+      "component": "Autovacuum",
+      "blast_radius": "critical",
+      "already_decaying": true,
+      "decay_evidence": "20% of 1TB table = 200GB of changes before vacuum triggers, causing massive bloat",
+      "earliest_signal_date": "2024-Q2",
+      "recommended_monitor_query": "SELECT schemaname, tablename, n_tup_ins + n_tup_upd + n_tup_del as total_changes, n_live_tup, round(100.0 * (n_tup_ins + n_tup_upd + n_tup_del) / NULLIF(n_live_tup, 0), 2) as change_pct FROM pg_stat_user_tables WHERE pg_total_relation_size(schemaname||'.'||tablename) > 10737418240 ORDER BY total_changes DESC"
+    },
+    {
+      "dpr_id": "DPR-011",
+      "title": "Shared Buffer Pool with Clock-Sweep",
+      "component": "Storage",
+      "blast_radius": "critical",
+      "already_decaying": false,
+      "decay_evidence": "Cloud instances with limited RAM make large buffer pools expensive, NVMe reducing cache miss penalty",
+      "earliest_signal_date": "2024-Q3",
+      "recommended_monitor_query": "SELECT sum(heap_blks_read) as heap_read, sum(heap_blks_hit) as heap_hit, round(100.0 * sum(heap_blks_hit) / NULLIF(sum(heap_blks_hit) + sum(heap_blks_read), 0), 2) as cache_hit_ratio FROM pg_statio_user_tables"
+    }
+  ],
+  "knowledge_concentration": {
+    "human_profiles": [
+      {
+        "name": "Tom Lane",
+        "dpr_count": 9,
+        "dprs": [
+          "DPR-002",
+          "DPR-003",
+          "DPR-004",
+          "DPR-005",
+          "DPR-006",
+          "DPR-007",
+          "DPR-008",
+          "DPR-011",
+          "DPR-012"
+        ],
+        "components": [
+          "Autovacuum",
+          "MVCC",
+          "Storage",
+          "WAL"
+        ],
+        "component_count": 4,
+        "avg_blast_score": 3.67,
+        "bus_factor_risk_score": 132.0
+      },
+      {
+        "name": "Heikki Linnakangas",
+        "dpr_count": 4,
+        "dprs": [
+          "DPR-003",
+          "DPR-005",
+          "DPR-007",
+          "DPR-014"
+        ],
+        "components": [
+          "MVCC",
+          "Replication",
+          "WAL"
+        ],
+        "component_count": 3,
+        "avg_blast_score": 3.5,
+        "bus_factor_risk_score": 42.0
+      },
+      {
+        "name": "Vadim Mikheev",
+        "dpr_count": 4,
+        "dprs": [
+          "DPR-003",
+          "DPR-007",
+          "DPR-010",
+          "DPR-013"
+        ],
+        "components": [
+          "MVCC",
+          "WAL"
+        ],
+        "component_count": 2,
+        "avg_blast_score": 3.5,
+        "bus_factor_risk_score": 28.0
+      },
+      {
+        "name": "Original PostgreSQL team",
+        "dpr_count": 2,
+        "dprs": [
+          "DPR-001",
+          "DPR-009"
+        ],
+        "components": [
+          "ProcessModel",
+          "Storage"
+        ],
+        "component_count": 2,
+        "avg_blast_score": 4.0,
+        "bus_factor_risk_score": 16.0
+      },
+      {
+        "name": "Andres Freund",
+        "dpr_count": 2,
+        "dprs": [
+          "DPR-004",
+          "DPR-011"
+        ],
+        "components": [
+          "MVCC",
+          "Storage"
+        ],
+        "component_count": 2,
+        "avg_blast_score": 4.0,
+        "bus_factor_risk_score": 16.0
+      },
+      {
+        "name": "Alvaro Herrera",
+        "dpr_count": 2,
+        "dprs": [
+          "DPR-006",
+          "DPR-008"
+        ],
+        "components": [
+          "Autovacuum",
+          "Storage"
+        ],
+        "component_count": 2,
+        "avg_blast_score": 4.0,
+        "bus_factor_risk_score": 16.0
+      },
+      {
+        "name": "Fujii Masao",
+        "dpr_count": 2,
+        "dprs": [
+          "DPR-013",
+          "DPR-014"
+        ],
+        "components": [
+          "Replication",
+          "WAL"
+        ],
+        "component_count": 2,
+        "avg_blast_score": 3.0,
+        "bus_factor_risk_score": 12.0
+      },
+      {
+        "name": "Jan Wieck",
+        "dpr_count": 1,
+        "dprs": [
+          "DPR-002"
+        ],
+        "components": [
+          "Storage"
+        ],
+        "component_count": 1,
+        "avg_blast_score": 3.0,
+        "bus_factor_risk_score": 3.0
+      },
+      {
+        "name": "Pavan Deolasee",
+        "dpr_count": 1,
+        "dprs": [
+          "DPR-005"
+        ],
+        "components": [
+          "MVCC"
+        ],
+        "component_count": 1,
+        "avg_blast_score": 3.0,
+        "bus_factor_risk_score": 3.0
+      },
+      {
+        "name": "Greg Smith",
+        "dpr_count": 1,
+        "dprs": [
+          "DPR-012"
+        ],
+        "components": [
+          "WAL"
+        ],
+        "component_count": 1,
+        "avg_blast_score": 3.0,
+        "bus_factor_risk_score": 3.0
+      },
+      {
+        "name": "pgBouncer: Marko Kreen",
+        "dpr_count": 1,
+        "dprs": [
+          "DPR-015"
+        ],
+        "components": [
+          "ProcessModel"
+        ],
+        "component_count": 1,
+        "avg_blast_score": 3.0,
+        "bus_factor_risk_score": 3.0
+      },
+      {
+        "name": "pgPool: Tatsuo Ishii",
+        "dpr_count": 1,
+        "dprs": [
+          "DPR-015"
+        ],
+        "components": [
+          "ProcessModel"
+        ],
+        "component_count": 1,
+        "avg_blast_score": 3.0,
+        "bus_factor_risk_score": 3.0
+      }
+    ],
+    "component_profiles": [
+      {
+        "component": "Partitioning",
+        "dpr_count": 1,
+        "dprs": [
+          "DPR-020"
+        ],
+        "avg_decay_risk": 0.0
+      },
+      {
+        "component": "Autovacuum",
+        "dpr_count": 1,
+        "dprs": [
+          "DPR-008"
+        ],
+        "avg_decay_risk": 1.0
+      },
+      {
+        "component": "Catalog",
+        "dpr_count": 1,
+        "dprs": [
+          "DPR-017"
+        ],
+        "avg_decay_risk": 0.0
+      },
+      {
+        "component": "ProcessModel",
+        "dpr_count": 2,
+        "dprs": [
+          "DPR-009",
+          "DPR-015"
+        ],
+        "avg_decay_risk": 0.0
+      },
+      {
+        "component": "AIO",
+        "dpr_count": 1,
+        "dprs": [
+          "DPR-023"
+        ],
+        "avg_decay_risk": 1.0
+      },
+      {
+        "component": "MVCC",
+        "dpr_count": 5,
+        "dprs": [
+          "DPR-003",
+          "DPR-004",
+          "DPR-005",
+          "DPR-010",
+          "DPR-024"
+        ],
+        "avg_decay_risk": 0.4
+      },
+      {
+        "component": "Executor",
+        "dpr_count": 3,
+        "dprs": [
+          "DPR-021",
+          "DPR-022",
+          "DPR-026"
+        ],
+        "avg_decay_risk": 0.0
+      },
+      {
+        "component": "Storage",
+        "dpr_count": 6,
+        "dprs": [
+          "DPR-001",
+          "DPR-002",
+          "DPR-006",
+          "DPR-011",
+          "DPR-027",
+          "DPR-030"
+        ],
+        "avg_decay_risk": 0.3333333333333333
+      },
+      {
+        "component": "IndexAM",
+        "dpr_count": 1,
+        "dprs": [
+          "DPR-018"
+        ],
+        "avg_decay_risk": 0.0
+      },
+      {
+        "component": "Planner",
+        "dpr_count": 2,
+        "dprs": [
+          "DPR-016",
+          "DPR-028"
+        ],
+        "avg_decay_risk": 0.0
+      },
+      {
+        "component": "Replication",
+        "dpr_count": 3,
+        "dprs": [
+          "DPR-014",
+          "DPR-019",
+          "DPR-029"
+        ],
+        "avg_decay_risk": 0.0
+      },
+      {
+        "component": "WAL",
+        "dpr_count": 4,
+        "dprs": [
+          "DPR-007",
+          "DPR-012",
+          "DPR-013",
+          "DPR-025"
+        ],
+        "avg_decay_risk": 0.0
+      }
+    ],
+    "top_spof_humans": [
+      "Tom Lane",
+      "Heikki Linnakangas",
+      "Vadim Mikheev",
+      "Original PostgreSQL team",
+      "Andres Freund"
+    ],
+    "top_spof_components": [
+      "Autovacuum",
+      "AIO",
+      "MVCC",
+      "Storage",
+      "Partitioning"
+    ]
+  },
+  "counterfactual_traces": [],
+  "monitoring_runs": [
+    {
+      "timestamp": "2026-05-17T08:28:48.810463+00:00",
+      "alerts_evaluated": 5,
+      "active_decay": 4
+    }
+  ]
+}

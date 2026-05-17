@@ -1,0 +1,263 @@
+﻿{
+    "nodes":  [
+                  {
+                      "id":  "DPR-001",
+                      "label":  "8KB Fixed Page Size",
+                      "component":  "Storage",
+                      "blast_radius":  "critical",
+                      "decay_risk":  "medium"
+                  },
+                  {
+                      "id":  "DPR-002",
+                      "label":  "TOAST - The Oversized-Attribute Storage Technique",
+                      "component":  "Storage",
+                      "blast_radius":  "high",
+                      "decay_risk":  "low"
+                  },
+                  {
+                      "id":  "DPR-003",
+                      "label":  "MVCC via Tuple Versioning in Heap",
+                      "component":  "MVCC",
+                      "blast_radius":  "critical",
+                      "decay_risk":  "high"
+                  },
+                  {
+                      "id":  "DPR-004",
+                      "label":  "32-bit Transaction ID with Wraparound",
+                      "component":  "MVCC",
+                      "blast_radius":  "critical",
+                      "decay_risk":  "high"
+                  },
+                  {
+                      "id":  "DPR-005",
+                      "label":  "HOT (Heap-Only Tuple) Updates",
+                      "component":  "MVCC",
+                      "blast_radius":  "high",
+                      "decay_risk":  "medium"
+                  },
+                  {
+                      "id":  "DPR-006",
+                      "label":  "Vacuum as Separate Maintenance Process",
+                      "component":  "Storage",
+                      "blast_radius":  "critical",
+                      "decay_risk":  "high"
+                  },
+                  {
+                      "id":  "DPR-007",
+                      "label":  "Write-Ahead Logging (WAL) for Durability",
+                      "component":  "WAL",
+                      "blast_radius":  "critical",
+                      "decay_risk":  "medium"
+                  },
+                  {
+                      "id":  "DPR-008",
+                      "label":  "Autovacuum as Background Daemon",
+                      "component":  "Autovacuum",
+                      "blast_radius":  "critical",
+                      "decay_risk":  "high"
+                  },
+                  {
+                      "id":  "DPR-009",
+                      "label":  "Multi-Process Architecture",
+                      "component":  "ProcessModel",
+                      "blast_radius":  "critical",
+                      "decay_risk":  "medium"
+                  },
+                  {
+                      "id":  "DPR-010",
+                      "label":  "Snapshot Isolation as Default",
+                      "component":  "MVCC",
+                      "blast_radius":  "high",
+                      "decay_risk":  "low"
+                  },
+                  {
+                      "id":  "DPR-011",
+                      "label":  "Shared Buffer Pool with Clock-Sweep",
+                      "component":  "Storage",
+                      "blast_radius":  "critical",
+                      "decay_risk":  "medium"
+                  },
+                  {
+                      "id":  "DPR-012",
+                      "label":  "Checkpoint-Based Crash Recovery",
+                      "component":  "WAL",
+                      "blast_radius":  "high",
+                      "decay_risk":  "medium"
+                  },
+                  {
+                      "id":  "DPR-013",
+                      "label":  "Full-Page Writes for Torn Page Protection",
+                      "component":  "WAL",
+                      "blast_radius":  "high",
+                      "decay_risk":  "low"
+                  },
+                  {
+                      "id":  "DPR-014",
+                      "label":  "Streaming Replication via WAL Shipping",
+                      "component":  "Replication",
+                      "blast_radius":  "high",
+                      "decay_risk":  "low"
+                  },
+                  {
+                      "id":  "DPR-015",
+                      "label":  "External Connection Pooling Required",
+                      "component":  "ProcessModel",
+                      "blast_radius":  "high",
+                      "decay_risk":  "low"
+                  }
+              ],
+    "edges":  [
+                  {
+                      "from":  "DPR-001",
+                      "to":  "DPR-002",
+                      "type":  "CONSTRAINS",
+                      "explanation":  "8KB page size forces TOAST for large values"
+                  },
+                  {
+                      "from":  "DPR-006",
+                      "to":  "DPR-003",
+                      "type":  "ASSUMPTION_OF",
+                      "explanation":  "Vacuum assumes manageable dead tuple rate"
+                  },
+                  {
+                      "from":  "DPR-004",
+                      "to":  "DPR-003",
+                      "type":  "ASSUMPTION_OF",
+                      "explanation":  "32-bit XID assumes short transaction lifetimes"
+                  },
+                  {
+                      "from":  "DPR-003",
+                      "to":  "DPR-004",
+                      "type":  "REQUIRES",
+                      "explanation":  "MVCC needs XIDs for visibility"
+                  },
+                  {
+                      "from":  "DPR-003",
+                      "to":  "DPR-005",
+                      "type":  "ENABLES",
+                      "explanation":  "Tuple versioning enables HOT optimization"
+                  },
+                  {
+                      "from":  "DPR-001",
+                      "to":  "DPR-005",
+                      "type":  "CONSTRAINS",
+                      "explanation":  "HOT updates must fit within 8KB page"
+                  },
+                  {
+                      "from":  "DPR-010",
+                      "to":  "DPR-006",
+                      "type":  "CONSTRAINS",
+                      "explanation":  "Long snapshots block vacuum"
+                  },
+                  {
+                      "from":  "DPR-005",
+                      "to":  "DPR-006",
+                      "type":  "REQUIRES",
+                      "explanation":  "HOT chains require vacuum pruning"
+                  },
+                  {
+                      "from":  "DPR-002",
+                      "to":  "DPR-006",
+                      "type":  "REQUIRES",
+                      "explanation":  "TOAST tables require vacuum cleanup"
+                  },
+                  {
+                      "from":  "DPR-004",
+                      "to":  "DPR-006",
+                      "type":  "REQUIRES",
+                      "explanation":  "XID wraparound requires vacuum freeze"
+                  },
+                  {
+                      "from":  "DPR-003",
+                      "to":  "DPR-006",
+                      "type":  "REQUIRES",
+                      "explanation":  "Tuple versioning requires vacuum cleanup"
+                  },
+                  {
+                      "from":  "DPR-003",
+                      "to":  "DPR-008",
+                      "type":  "REQUIRES",
+                      "explanation":  "MVCC bloat requires autovacuum"
+                  },
+                  {
+                      "from":  "DPR-006",
+                      "to":  "DPR-008",
+                      "type":  "ENABLES",
+                      "explanation":  "Vacuum process enables autovacuum automation"
+                  },
+                  {
+                      "from":  "DPR-004",
+                      "to":  "DPR-008",
+                      "type":  "REQUIRES",
+                      "explanation":  "Wraparound prevention requires autovacuum"
+                  },
+                  {
+                      "from":  "DPR-003",
+                      "to":  "DPR-010",
+                      "type":  "ENABLES",
+                      "explanation":  "Tuple versioning enables snapshot isolation"
+                  },
+                  {
+                      "from":  "DPR-009",
+                      "to":  "DPR-011",
+                      "type":  "REQUIRES",
+                      "explanation":  "Multi-process requires shared buffer pool"
+                  },
+                  {
+                      "from":  "DPR-001",
+                      "to":  "DPR-011",
+                      "type":  "CONSTRAINS",
+                      "explanation":  "Buffer pool manages 8KB units"
+                  },
+                  {
+                      "from":  "DPR-011",
+                      "to":  "DPR-012",
+                      "type":  "REQUIRED_BY",
+                      "explanation":  "Checkpoints write dirty buffers from pool"
+                  },
+                  {
+                      "from":  "DPR-007",
+                      "to":  "DPR-012",
+                      "type":  "ENABLES",
+                      "explanation":  "WAL enables checkpoint-based recovery"
+                  },
+                  {
+                      "from":  "DPR-001",
+                      "to":  "DPR-012",
+                      "type":  "CONSTRAINS",
+                      "explanation":  "Checkpoints write 8KB pages"
+                  },
+                  {
+                      "from":  "DPR-012",
+                      "to":  "DPR-013",
+                      "type":  "TEMPORAL_PRECEDES",
+                      "explanation":  "Checkpoints trigger full-page writes"
+                  },
+                  {
+                      "from":  "DPR-007",
+                      "to":  "DPR-013",
+                      "type":  "REQUIRES",
+                      "explanation":  "WAL stores full-page writes"
+                  },
+                  {
+                      "from":  "DPR-001",
+                      "to":  "DPR-013",
+                      "type":  "CONSTRAINS",
+                      "explanation":  "Full-page writes are 8KB"
+                  },
+                  {
+                      "from":  "DPR-007",
+                      "to":  "DPR-014",
+                      "type":  "ENABLES",
+                      "explanation":  "WAL enables streaming replication"
+                  },
+                  {
+                      "from":  "DPR-009",
+                      "to":  "DPR-015",
+                      "type":  "REQUIRES",
+                      "explanation":  "Process-per-connection requires external pooling"
+                  }
+              ],
+    "node_count":  15,
+    "edge_count":  25
+}

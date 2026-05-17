@@ -1,0 +1,220 @@
+{
+  "nexus_layer1_output": {
+    "repository": "https://github.com/postgres/postgres",
+    "analysis_window": "1year",
+    "window_cutoff_date": "2025-05-17",
+    "analysis_timestamp": "2026-05-17T08:13:48.926014+00:00",
+    "total_dprs": 30,
+    "dprs_within_window": 10,
+    "dprs_pre_window_active": 20,
+    "dprs": [
+      {
+        "dpr_id": "DPR-001",
+        "title": "Multi-Version Concurrency Control (MVCC) Architecture",
+        "component": "MVCC",
+        "within_window": false,
+        "decision_date": "1995-01-01",
+        "decision": "Implement a non-blocking, snapshot isolation concurrency control model using tuple versioning (HOT chains, XMIN/XMAX).",
+        "rejected_alternatives": [
+          "Lock-based concurrency control (e.g., shared/exclusive locks on rows/pages).",
+          "Optimistic concurrency control with rollbacks on conflict.",
+          "Single-version concurrency control with read locks."
+        ],
+        "explicit_constraints": [
+          "High concurrency for mixed read/write workloads.",
+          "Avoid reader-writer blocking.",
+          "Ensure ACID properties (Atomicity, Consistency, Isolation, Durability)."
+        ],
+        "implicit_assumptions": [
+          "INFERRED: Disk space is relatively cheap and abundant for storing multiple tuple versions.",
+          "INFERRED: Regular cleanup (VACUUM) will manage dead tuple accumulation effectively."
+        ],
+        "intended_durability": "High",
+        "durability_reasoning": "Fundamental to PostgreSQL's core concurrency model; changing it would require a complete rewrite of the storage engine and transaction management.",
+        "causal_dependencies": [],
+        "files_involved": [
+          "src/backend/access/heap/heapam.c",
+          "src/backend/access/transam/xact.c",
+          "src/backend/utils/time/tqual.c"
+        ],
+        "commit_refs": [
+          "initial-design-pre-git"
+        ],
+        "involved_humans": [
+          "Michael Stonebraker",
+          "Many core developers"
+        ],
+        "assumption_decay_risk": "Medium",
+        "decay_risk_reasoning": "The assumption about disk space and VACUUM efficiency has been challenged by very high write workloads and large tables, leading to VACUUM tuning complexities and bloat issues.",
+        "blast_radius_estimate": "System-wide",
+        "blast_radius_reasoning": "MVCC is integral to every transaction, query, and storage operation.",
+        "active_workarounds": [
+          "Autovacuum tuning",
+          "VACUUM FULL",
+          "pg_repack",
+          "HOT updates",
+          "B-tree deduplication"
+        ]
+      },
+      {
+        "dpr_id": "DPR-002",
+        "title": "WAL-based Recovery for Durability and Crash Recovery",
+        "component": "WAL",
+        "within_window": false,
+        "decision_date": "1995-01-01",
+        "decision": "Implement a Write-Ahead Log (WAL) to ensure transaction durability and enable crash recovery and point-in-time recovery.",
+        "rejected_alternatives": [
+          "Force-writing all data pages to disk on commit.",
+          "Shadow paging (copy-on-write for pages).",
+          "Undo/Redo logs separate from data pages."
+        ],
+        "explicit_constraints": [
+          "Ensure ACID Durability property.",
+          "Minimize disk I/O for transaction commits.",
+          "Enable reliable crash recovery to a consistent state."
+        ],
+        "implicit_assumptions": [
+          "INFERRED: Sequential writes to WAL are significantly faster than random writes to data pages.",
+          "INFERRED: The WAL can be reliably stored on persistent storage."
+        ],
+        "intended_durability": "High",
+        "durability_reasoning": "Core to data integrity and reliability; any change would fundamentally alter how PostgreSQL guarantees data safety.",
+        "causal_dependencies": [],
+        "files_involved": [
+          "src/backend/access/transam/xlog.c",
+          "src/backend/access/transam/xlogfuncs.c",
+          "src/backend/storage/buffer/bufmgr.c"
+        ],
+        "commit_refs": [
+          "initial-design-pre-git"
+        ],
+        "involved_humans": [
+          "Many core developers"
+        ],
+        "assumption_decay_risk": "Low",
+        "decay_risk_reasoning": "The assumption about sequential WAL writes remains largely true, though SSDs have reduced the performance gap with random writes. Reliability of storage is a fundamental OS/hardware assumption.",
+        "blast_radius_estimate": "System-wide",
+        "blast_radius_reasoning": "WAL is involved in every data modification and is critical for recovery and replication.",
+        "active_workarounds": [
+          "fsync settings",
+          "wal_level configuration",
+          "archive_mode"
+        ]
+      },
+      {
+        "dpr_id": "DPR-003",
+        "title": "Process-per-connection Model",
+        "component": "Connection Handling",
+        "within_window": false,
+        "decision_date": "1995-01-01",
+        "decision": "Use a process-per-connection model where the postmaster forks a new backend process for each client connection.",
+        "rejected_alternatives": [
+          "Thread-per-connection model (single process, multiple threads).",
+          "Event-driven, asynchronous I/O model (single process, non-blocking).",
+          "Connection pooling within the database server itself."
+        ],
+        "explicit_constraints": [
+          "Isolation between client sessions.",
+          "Leverage OS process isolation and scheduling.",
+          "Simplicity of development for early PostgreSQL."
+        ],
+        "implicit_assumptions": [
+          "INFERRED: OS process management overhead is acceptable for typical workloads.",
+          "INFERRED: Memory consumption per process is manageable for the expected number of connections."
+        ],
+        "intended_durability": "High",
+        "durability_reasoning": "Deeply ingrained in the server architecture, affecting memory management, concurrency, and resource allocation.",
+        "causal_dependencies": [],
+        "files_involved": [
+          "src/backend/postmaster/postmaster.c",
+          "src/backend/tcop/postgres.c",
+          "src/backend/main/main.c"
+        ],
+        "commit_refs": [
+          "initial-design-pre-git"
+        ],
+        "involved_humans": [
+          "Michael Stonebraker",
+          "Early PostgreSQL developers"
+        ],
+        "assumption_decay_risk": "Medium",
+        "decay_risk_reasoning": "Modern systems often handle thousands of connections, where process overhead and memory footprint become significant. This has led to external connection poolers (PgBouncer).",
+        "blast_radius_estimate": "System-wide",
+        "blast_radius_reasoning": "Affects resource usage, scalability, and the fundamental interaction model with clients.",
+        "active_workarounds": [
+          "External connection poolers (PgBouncer)",
+          "max_connections tuning",
+          "shared_buffers sizing"
+        ]
+      },
+      {
+        "dpr_id": "DPR-004",
+        "title": "Extensible Index Access Method Interface",
+        "component": "Index Access Methods",
+        "within_window": false,
+        "decision_date": "1998-01-01",
+        "decision": "Design an extensible interface for index access methods, allowing new index types (e.g., GiST, GIN, SP-GiST, BRIN) to be added without modifying core database code.",
+        "rejected_alternatives": [
+          "Hardcode only B-tree and Hash indexes.",
+          "Require core code changes for every new index type."
+        ],
+        "explicit_constraints": [
+          "Support diverse data types and query patterns (e.g., full-text search, geometric data).",
+          "Maintain separation of concerns between index logic and core database operations.",
+          "Allow community and third-party development of specialized indexes."
+        ],
+        "implicit_assumptions": [
+          "INFERRED: The overhead of the generic interface is acceptable for performance.",
+          "INFERRED: A stable API can be maintained across major versions."
+        ],
+        "intended_durability": "High",
+        "durability_reasoning": "A cornerstone of PostgreSQL's extensibility; changing this would break existing index types and limit future innovation.",
+        "causal_dependencies": [],
+        "files_involved": [
+          "src/include/access/amapi.h",
+          "src/backend/access/index/indexam.c",
+          "src/backend/access/nbtree/nbtree.c"
+        ],
+        "commit_refs": [
+          "initial-design-pre-git"
+        ],
+        "involved_humans": [
+          "Oleg Bartunov",
+          "Teodor Sigaev",
+          "Alexander Korotkov",
+          "Tom Lane"
+        ],
+        "assumption_decay_risk": "Low",
+        "decay_risk_reasoning": "The API has proven stable and flexible, with minimal overhead.",
+        "blast_radius_estimate": "Subsystem-wide (Index Access Methods)",
+        "blast_radius_reasoning": "Affects all index operations, query planning, and storage.",
+        "active_workarounds": []
+      },
+      {
+        "dpr_id": "DPR-005",
+        "title": "System Catalog Architecture",
+        "component": "Catalog",
+        "within_window": false,
+        "decision_date": "1995-01-01",
+        "decision": "Store all database metadata (table definitions, column types, indexes, users, etc.) in regular PostgreSQL tables, accessible via SQL queries.",
+        "rejected_alternatives": [
+          "Store metadata in flat files or specialized binary formats.",
+          "Use a separate, non-SQL-accessible metadata store."
+        ],
+        "explicit_constraints": [
+          "Consistency and transactional integrity for metadata.",
+          "Leverage existing SQL query engine for metadata access.",
+          "Simplify development by treating metadata like regular data."
+        ],
+        "implicit_assumptions": [
+          "INFERRED: Performance overhead of querying system tables is acceptable.",
+          "INFERRED: The system catalog will not become a significant bottleneck for typical operations."
+        ],
+        "intended_durability": "High",
+        "durability_reasoning": "Fundamental to how PostgreSQL understands and manages its own structure; changing this would require a complete rewrite of the database's self-description.",
+        "causal_dependencies": [],
+        "files_involved": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,111 @@
+﻿{
+    "alerts":  [
+                   {
+                       "dpr_id":  "DPR-003",
+                       "title":  "MVCC via Tuple Versioning in Heap",
+                       "component":  "MVCC",
+                       "blast_radius":  "critical",
+                       "already_decaying":  true,
+                       "decay_evidence":  "High-update workloads on cloud storage creating bloat faster than vacuum can clean",
+                       "earliest_signal_date":  "2024-Q3",
+                       "recommended_monitor_query":  "SELECT schemaname, tablename, n_dead_tup, n_live_tup, round(100.0 * n_dead_tup / NULLIF(n_live_tup + n_dead_tup, 0), 2) as dead_pct FROM pg_stat_user_tables WHERE n_dead_tup \u003e 10000 ORDER BY n_dead_tup DESC"
+                   },
+                   {
+                       "dpr_id":  "DPR-004",
+                       "title":  "32-bit Transaction ID with Wraparound",
+                       "component":  "MVCC",
+                       "blast_radius":  "critical",
+                       "already_decaying":  true,
+                       "decay_evidence":  "High-throughput OLTP systems (100K+ TPS) can generate 2B transactions in ~6 hours",
+                       "earliest_signal_date":  "2024-Q2",
+                       "recommended_monitor_query":  "SELECT datname, age(datfrozenxid) as xid_age, 2000000000 - age(datfrozenxid) as xids_until_wraparound FROM pg_database WHERE datallowconn ORDER BY age(datfrozenxid) DESC"
+                   },
+                   {
+                       "dpr_id":  "DPR-006",
+                       "title":  "Vacuum as Separate Maintenance Process",
+                       "component":  "Storage",
+                       "blast_radius":  "critical",
+                       "already_decaying":  true,
+                       "decay_evidence":  "TB-scale tables taking 6-12 hours to vacuum, cloud storage IOPS limits making vacuum expensive",
+                       "earliest_signal_date":  "2024-Q1",
+                       "recommended_monitor_query":  "SELECT pid, datname, relid::regclass, phase, heap_blks_total, heap_blks_scanned, round(100.0 * heap_blks_scanned / NULLIF(heap_blks_total, 0), 2) as pct_complete FROM pg_stat_progress_vacuum"
+                   },
+                   {
+                       "dpr_id":  "DPR-008",
+                       "title":  "Autovacuum as Background Daemon",
+                       "component":  "Autovacuum",
+                       "blast_radius":  "critical",
+                       "already_decaying":  true,
+                       "decay_evidence":  "20% of 1TB table = 200GB of changes before vacuum triggers, causing massive bloat",
+                       "earliest_signal_date":  "2024-Q2",
+                       "recommended_monitor_query":  "SELECT schemaname, tablename, n_tup_ins + n_tup_upd + n_tup_del as total_changes, n_live_tup, round(100.0 * (n_tup_ins + n_tup_upd + n_tup_del) / NULLIF(n_live_tup, 0), 2) as change_pct FROM pg_stat_user_tables WHERE pg_total_relation_size(schemaname||\u0027.\u0027||tablename) \u003e 10737418240 ORDER BY total_changes DESC"
+                   },
+                   {
+                       "dpr_id":  "DPR-011",
+                       "title":  "Shared Buffer Pool with Clock-Sweep",
+                       "component":  "Storage",
+                       "blast_radius":  "critical",
+                       "already_decaying":  false,
+                       "decay_evidence":  "Cloud instances with limited RAM make large buffer pools expensive, NVMe reducing cache miss penalty",
+                       "earliest_signal_date":  "2024-Q3",
+                       "recommended_monitor_query":  "SELECT sum(heap_blks_read) as heap_read, sum(heap_blks_hit) as heap_hit, round(100.0 * sum(heap_blks_hit) / NULLIF(sum(heap_blks_hit) + sum(heap_blks_read), 0), 2) as cache_hit_ratio FROM pg_statio_user_tables"
+                   }
+               ],
+    "total_alerts":  5,
+    "active_decay":  4,
+    "monitoring_runs":  [
+                            {
+                                "run_at":  "2026-05-17T06:33:14.149691+00:00",
+                                "commits_scanned":  1,
+                                "dprs_evaluated":  0,
+                                "new_alerts":  0,
+                                "alert_summary":  [
+
+                                                  ]
+                            },
+                            {
+                                "run_at":  "2026-05-17T06:35:26.852971+00:00",
+                                "commits_scanned":  5,
+                                "dprs_evaluated":  6,
+                                "new_alerts":  2,
+                                "alert_summary":  [
+                                                      {
+                                                          "dpr_id":  "DPR-006",
+                                                          "confidence":  0.1,
+                                                          "still_holds":  false,
+                                                          "trend":  "neutral"
+                                                      },
+                                                      {
+                                                          "dpr_id":  "DPR-008",
+                                                          "confidence":  0.2,
+                                                          "still_holds":  false,
+                                                          "trend":  "weakened"
+                                                      },
+                                                      {
+                                                          "dpr_id":  "DPR-011",
+                                                          "confidence":  0.85,
+                                                          "still_holds":  true,
+                                                          "trend":  "strengthened"
+                                                      },
+                                                      {
+                                                          "dpr_id":  "DPR-007",
+                                                          "confidence":  0.9,
+                                                          "still_holds":  true,
+                                                          "trend":  "strengthened"
+                                                      },
+                                                      {
+                                                          "dpr_id":  "DPR-012",
+                                                          "confidence":  0.85,
+                                                          "still_holds":  true,
+                                                          "trend":  "strengthened"
+                                                      },
+                                                      {
+                                                          "dpr_id":  "DPR-009",
+                                                          "confidence":  0.9,
+                                                          "still_holds":  true,
+                                                          "trend":  "strengthened"
+                                                      }
+                                                  ]
+                            }
+                        ]
+}
